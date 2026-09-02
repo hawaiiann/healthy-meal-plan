@@ -96,6 +96,56 @@ const probe = `
     }
   console.log('разбор приёмов: ' + parsed + ' раскладываются на продукты, ' + whole + ' из готовых блюд');
   console.log('проблем в конструкторе:', cp);
+
+  // свои продукты
+  let fp = 0;
+  const set = (id, v) => { document.getElementById(id).value = v; };
+  const tryAdd = (n, cat, k, p, f, c, unit) => {
+    showForm = true;
+    set('fn', n); set('fc', cat); set('fk', k); set('fp', p); set('ff', f); set('fu', c); set('fs', unit === undefined ? '' : unit);
+    const before = custom.length;
+    saveFood();
+    return { added: custom.length > before, msg: formMsg };
+  };
+  const cases = [
+    ['',            'Белок', 240, 19, 18, 1,  '', false, 'пустое название'],
+    ['ы',           'Белок', 240, 19, 18, 1,  '', false, 'слишком короткое имя'],
+    ['творог 5%',   'Белок', 240, 19, 18, 1,  '', false, 'дубликат существующего'],
+    ['тест нольккал','Белок',  0, 19, 18, 1,  '', false, 'нулевая калорийность'],
+    ['тест минус',  'Белок', 240, -5, 18, 1,  '', false, 'отрицательный белок'],
+    ['тест сумма',  'Белок', 240, 60, 40, 30, '', false, 'макросы тяжелее 100 г'],
+    ['сыр адыгейский','Белок',240, 19, 18, 1.5,'', true,  'корректный'],
+    ['лаваш штучный','Гарниры',275, 9, 1, 56, 80, true,  'штучный продукт']
+  ];
+  for (const [n, cat, k, p, f, c, unit, expect, what] of cases) {
+    const r = tryAdd(n, cat, k, p, f, c, unit);
+    if (r.added !== expect) { fp++; console.log('  ВАЛИДАЦИЯ «' + what + '»: ожидалось ' + (expect ? 'принять' : 'отклонить')); }
+    if (!expect && !r.msg) { fp++; console.log('  «' + what + '» отклонён молча, без объяснения'); }
+  }
+  // предупреждение о расхождении калорийности с макросами
+  tryAdd('тест расхождение', 'Белок', 100, 30, 30, 30, '');
+  if (!formMsg || formMsg[0] !== '?') { fp++; console.log('  нет предупреждения о расхождении ккал и макросов'); }
+
+  // свои продукты видны кладовке и участвуют в сборке
+  if (!FOOD['сыр адыгейский']) { fp++; console.log('  свой продукт не попал в базу'); }
+  if (!pantry['сыр адыгейский']) { fp++; console.log('  свой продукт не отмечен в кладовке'); }
+  if (!allFoods().some(f => f.mine)) { fp++; console.log('  свои продукты не помечены признаком mine'); }
+  if (bad(pageCons()).length) { fp++; console.log('  ПРОБЛЕМА отрисовки со своими продуктами'); }
+  showForm = true;
+  if (bad(pageCons()).length) { fp++; console.log('  ПРОБЛЕМА отрисовки формы'); }
+  showForm = false;
+
+  // пустая кладовка не должна ронять сборку
+  const savedPantry = pantry;
+  pantry = {};
+  if (assemble('Обед') !== null) { fp++; console.log('  пустая кладовка должна давать null, а не мусор'); }
+  pantry = savedPantry;
+
+  // удаление своего продукта
+  custom = custom.filter(f => f.n !== 'сыр адыгейский');
+  rebuildFood();
+  if (FOOD['сыр адыгейский']) { fp++; console.log('  удалённый продукт остался в базе'); }
+  console.log('проблем со своими продуктами:', fp);
   console.log('сегодня по календарю: индекс ' + TODAY + ' -> ' + PLAN.days[TODAY].name);
 })();
 `;

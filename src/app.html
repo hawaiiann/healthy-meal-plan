@@ -130,6 +130,26 @@ button{font:inherit; color:inherit; border:none; background:none; cursor:pointer
   font-family:Nunito,sans-serif; font-weight:700; font-size:12px}
 .promo button:hover{background:var(--lime-d)}
 
+/* ---------- свой продукт ---------- */
+.ffm{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; padding:12px;
+  background:var(--mint); border:1px solid var(--line-c); border-radius:var(--r2); margin-bottom:10px}
+.ffm .wide{grid-column:1 / -1}
+.ffm label{display:block; font-family:Nunito,sans-serif; font-size:9.5px; font-weight:700;
+  letter-spacing:.09em; text-transform:uppercase; color:var(--ink3); margin-bottom:4px}
+.ffm input,.ffm select{width:100%; padding:7px 9px; border-radius:8px; border:1px solid var(--line-c);
+  background:var(--card); color:var(--ink); font:inherit; font-size:13px}
+.ffm .row{grid-column:1 / -1; display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+.ffm .msg{grid-column:1 / -1; font-size:11.5px; line-height:1.4; padding:8px 10px; border-radius:var(--r3)}
+.ffm .msg.err{background:var(--prot-bg); color:var(--prot-ink)}
+.ffm .msg.warn{background:var(--carb-bg); color:var(--carb-ink)}
+.ffm .msg.hint{background:var(--card); color:var(--ink3); border:1px solid var(--line-c)}
+.pline{display:flex; align-items:center; gap:2px}
+.pline label{flex:1 1 auto; min-width:0}
+.pline .rm{width:20px; height:20px; border-radius:6px; color:var(--ink3); display:grid; place-items:center; flex:0 0 auto}
+.pline .rm:hover{background:var(--prot-bg); color:var(--prot-ink)}
+.pline .rm svg{width:11px; height:11px}
+.mine{display:inline-block; width:5px; height:5px; border-radius:50%; background:var(--lime-d); flex:0 0 auto}
+
 /* ---------- конструктор ---------- */
 .cons{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,300px); gap:16px; align-items:start}
 .cons-tools{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px}
@@ -508,7 +528,7 @@ const SHOP = [
   ]],
   ['Впрок и по случаю','Самовывоз со скидкой — ассортимент лотерейный, берите что есть',[
     ['Крупы и мука',[['Овсяные хлопья','1,5 кг'],['Гречка','1 кг'],['Рис пропаренный','1 кг'],['Булгур, перловка','по 500 г'],['Листы для лазаньи','2 пачки'],['Мука пшеничная','2 кг'],['Мука цельнозерновая','1 кг'],['Манка','500 г']]],
-    ['Долгие запасы',[['Тунец в собственном соку','3 банки'],['Горошек консервированный','4 банки'],['Кукуруза консервированная','2 банки'],['Томатная паста','2 банки'],['Ягоды замороженные','1 кг'],['Арахисовая паста','350 г'],['Орехи грецкие','300 г'],['Масло растительное','—'],['Дрожжи сухие','упаковка'],['Хлебцы','2 пачки']]],
+    ['Долгие запасы',[['Тунец в собственном соку','3 банки'],['Нут','500 г'],['Горошек консервированный','4 банки'],['Кукуруза консервированная','2 банки'],['Томатная паста','2 банки'],['Ягоды замороженные','1 кг'],['Арахисовая паста','350 г'],['Орехи грецкие','300 г'],['Масло растительное','—'],['Дрожжи сухие','упаковка'],['Хлебцы','2 пачки']]],
     ['Сладкий бюджет',[['Шоколад горький 85%','2 плитки'],['Зефир','250 г'],['Пастила / мармелад','250 г'],['Какао-порошок','200 г'],['Финики','200 г'],['Мёд','250 г']]],
     ['Уже есть дома',[['Протеин сливочный','~500 г/нед'],['Семена чиа','~150 г/нед'],['Семечки тыквенные','~150 г/нед'],['Подсолнечные, кунжут','по 80 г']]]
   ]]
@@ -537,7 +557,9 @@ let query = '';
 let openRec = 0;
 const TODAY = (new Date().getDay() + 6) % 7;   /* 0 = понедельник */
 let pantry = store.get('kotel.pantry', null);
-if(!pantry) pantry = Object.fromEntries(PLAN.foods.map(f => [f.n, f.on]));
+if(!pantry || typeof pantry !== 'object') pantry = {};
+/* новые продукты подхватываются в уже сохранённую кладовку по умолчанию продукта */
+PLAN.foods.forEach(f => { if(!(f.n in pantry)) pantry[f.n] = f.on; });
 let built = [];
 let consNote = '';
 let aimMeal = 'Обед';
@@ -583,7 +605,15 @@ function searchAll(raw){
           total: meals.length + recipes.length + snacks.length + sweets.length + shop.length};
 }
 /* ================= конструктор ================= */
-const FOOD = Object.fromEntries(PLAN.foods.map(f => [f.n, f]));
+/* Свои продукты живут в localStorage и подмешиваются к зашитой базе.
+   Формат тот же, что у PLAN.foods, плюс признак mine. */
+let custom = store.get('kotel.custom', []) || [];
+if(!Array.isArray(custom)) custom = [];
+const allFoods = () => PLAN.foods.concat(custom);
+let FOOD = {};
+const rebuildFood = () => { FOOD = Object.fromEntries(allFoods().map(f => [f.n, f])); };
+rebuildFood();
+let showForm = false, formMsg = '';
 /* доля приёма в дневной норме */
 const SHARE = { 'Завтрак':0.24, 'Обед':0.31, 'Ужин':0.26, 'Перекус':0.10 };
 
@@ -603,7 +633,7 @@ function roundG(f, g){
   if(f.unit) return Math.max(f.unit, Math.round(g / f.unit) * f.unit);
   return Math.max(5, Math.round(g / 5) * 5);
 }
-function have(cat){ return PLAN.foods.filter(f => f.cat === cat && pantry[f.n]); }
+function have(cat){ return allFoods().filter(f => f.cat === cat && pantry[f.n]); }
 const pick = arr => arr.length ? arr[Math.floor(Math.random() * arr.length)] : null;
 
 /* Сборка приёма. Белок задаёт стартовую навеску, дальше калории
@@ -703,8 +733,22 @@ function pageCons(){
     </div>`;
   }).join('') : `<p class="empty"><b>Пусто</b>Соберите приём из отмеченных продуктов или возьмите за основу готовый.</p>`;
 
-  const cats = [...new Set(PLAN.foods.map(f => f.cat))];
-  const onCount = PLAN.foods.filter(f => pantry[f.n]).length;
+  const list = allFoods();
+  const cats = [...new Set(list.map(f => f.cat))];
+  const onCount = list.filter(f => pantry[f.n]).length;
+  const catOpts = cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  const form = showForm ? `
+    <div class="ffm">
+      <div class="wide"><label for="fn">Название</label><input id="fn" type="text" maxlength="40" placeholder="Например: сыр адыгейский"></div>
+      <div class="wide"><label for="fc">Категория</label><select id="fc">${catOpts}</select></div>
+      <div><label for="fk">Ккал / 100 г</label><input id="fk" type="number" min="0" max="900" step="1" placeholder="240"></div>
+      <div><label for="fp">Белок, г</label><input id="fp" type="number" min="0" max="100" step="0.1" placeholder="19"></div>
+      <div><label for="ff">Жиры, г</label><input id="ff" type="number" min="0" max="100" step="0.1" placeholder="18"></div>
+      <div><label for="fu">Углеводы, г</label><input id="fu" type="number" min="0" max="100" step="0.1" placeholder="1.5"></div>
+      <div class="wide"><label for="fs">Вес одной штуки, г — если продукт штучный</label><input id="fs" type="number" min="0" max="1000" step="1" placeholder="не обязательно"></div>
+      <p class="msg ${formMsg ? (formMsg[0] === '!' ? 'err' : 'warn') : 'hint'}">${formMsg ? esc(formMsg.replace(/^[!?]/, '')) : 'КБЖУ берите с упаковки, на 100 г. Продукт сразу попадёт в кладовку и будет участвовать в сборке.'}</p>
+      <div class="row"><button type="button" class="btn" id="saveFood">Сохранить</button><button type="button" class="btn btn-2" id="cancelFood">Отмена</button></div>
+    </div>` : '';
 
   return `
   <div class="card sec">
@@ -728,14 +772,48 @@ function pageCons(){
         <p class="verdict ${vcls}" style="margin-top:12px">${verdict}</p>
       </div>
       <div>
-        <div class="sec-h" style="margin-bottom:8px"><h2 style="font-size:14px">Что есть дома</h2><span class="lbl">${onCount} из ${PLAN.foods.length}</span></div>
+        <div class="sec-h" style="margin-bottom:8px"><h2 style="font-size:14px">Что есть дома</h2><span class="lbl">${onCount} из ${list.length}</span></div>
+        ${showForm ? '' : '<button type="button" class="btn btn-2" id="addFood" style="margin-bottom:10px">' + svg('plus') + 'Свой продукт</button>'}
+        ${form}
         <div class="pantry">${cats.map(c =>
-          `<span class="lbl">${esc(c)}</span>` + PLAN.foods.filter(f => f.cat === c).map(f =>
-            `<label><input type="checkbox" data-food="${esc(f.n)}"${pantry[f.n] ? ' checked' : ''}><span>${esc(f.n)}</span><span class="kcal">${Math.round(f.k)}</span></label>`
-          ).join('')).join('')}</div>
+          `<span class="lbl">${esc(c)}</span>` + list.filter(f => f.cat === c).map(f => {
+            const box = `<label><input type="checkbox" data-food="${esc(f.n)}"${pantry[f.n] ? ' checked' : ''}>${f.mine ? '<span class="mine" title="свой продукт"></span>' : ''}<span>${esc(f.n)}</span><span class="kcal">${Math.round(f.k)}</span></label>`;
+            return f.mine
+              ? `<div class="pline">${box}<button type="button" class="rm" data-rmfood="${esc(f.n)}" aria-label="Удалить ${esc(f.n)}">${svg('x')}</button></div>`
+              : box;
+          }).join('')).join('')}</div>
       </div>
     </div>
   </div>`;
+}
+
+/* Свой продукт: валидируем то, что реально ломает расчёт, а спорное
+   показываем предупреждением и всё равно сохраняем — на упаковках
+   сумма макросов часто не сходится с калорийностью. */
+function saveFood(){
+  const val = id => (document.getElementById(id) || {}).value || '';
+  const num = id => { const v = parseFloat(String(val(id)).replace(',', '.')); return isNaN(v) ? 0 : v; };
+  const n = val('fn').trim().replace(/["'<>]/g, '');
+  const k = num('fk'), p = num('fp'), f = num('ff'), c = num('fu'), unit = Math.round(num('fs'));
+
+  if(n.length < 2){ formMsg = '!Название нужно хотя бы из двух букв.'; render(); return; }
+  if(FOOD[n]){ formMsg = '!Продукт «' + n + '» уже есть в списке. Назовите иначе или отредактируйте существующий.'; render(); return; }
+  if(k <= 0 || k > 900){ formMsg = '!Калорийность должна быть от 1 до 900 ккал на 100 г.'; render(); return; }
+  if(p < 0 || f < 0 || c < 0){ formMsg = '!Макросы не бывают отрицательными.'; render(); return; }
+  if(p + f + c > 100){ formMsg = '!Белки, жиры и углеводы вместе не могут весить больше 100 г из 100 г.'; render(); return; }
+  if(unit < 0 || unit > 1000){ formMsg = '!Вес штуки — от 1 до 1000 г, либо оставьте поле пустым.'; render(); return; }
+
+  const calc = p * 4 + f * 9 + c * 4;
+  const off = Math.abs(calc - k);
+  custom.push({ n, cat: val('fc') || 'Белок', k, p, f, c, unit: unit > 0 ? unit : 0, on: true, mine: true });
+  pantry[n] = true;
+  store.set('kotel.custom', custom); store.set('kotel.pantry', pantry);
+  rebuildFood();
+  showForm = false;
+  formMsg = off > Math.max(25, k * 0.25)
+    ? '?Сохранил, но сверьтесь: по макросам выходит ' + Math.round(calc) + ' ккал, а вы указали ' + Math.round(k) + '. Считать буду по вашей цифре.'
+    : '';
+  render();
 }
 
 function pageSearch(){
@@ -800,7 +878,7 @@ const SUBS = {
 /* ---------- рендер ---------- */
 function renderNav(){
   document.getElementById('nav').innerHTML = PAGES.map(([id,t,ic])=>{
-    const c = id==='week' ? PLAN.days.length : id==='cons' ? PLAN.foods.length : id==='recipes' ? PLAN.recipes.length
+    const c = id==='week' ? PLAN.days.length : id==='cons' ? allFoods().length : id==='recipes' ? PLAN.recipes.length
             : id==='snacks' ? PLAN.snacks.length+PLAN.sweets.length : '';
     return `<button type="button" data-page="${id}" aria-current="${id===page}">${svg(ic)}<span>${t}</span>${c?`<span class="count">${c}</span>`:''}</button>`;
   }).join('');
@@ -1045,6 +1123,18 @@ document.addEventListener('click', e=>{
       else item.g = Math.max(f.unit || 5, item.g - step);
     }
     render(); return;
+  }
+  if(e.target.closest('#addFood')){ showForm = true; formMsg = ''; render(); return; }
+  if(e.target.closest('#cancelFood')){ showForm = false; formMsg = ''; render(); return; }
+  if(e.target.closest('#saveFood')){ saveFood(); return; }
+  const rm = e.target.closest('[data-rmfood]');
+  if(rm){
+    const n = rm.dataset.rmfood;
+    custom = custom.filter(f => f.n !== n);
+    delete pantry[n];
+    built = built.filter(x => x.n !== n);
+    store.set('kotel.custom', custom); store.set('kotel.pantry', pantry);
+    rebuildFood(); render(); return;
   }
   if(e.target.closest('#doBuild')){
     consNote = '';
