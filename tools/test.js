@@ -106,6 +106,27 @@ const probe = `
   console.log('разбор приёмов: ' + parsed + ' раскладываются на продукты, ' + whole + ' из готовых блюд');
   console.log('проблем в конструкторе:', cp);
 
+  // Отдельный прогон только по цифрам, без отрисовки: 400 сборок на каждый
+  // приём. Проверка в цикле выше вероятностная — редкий шаблон может в 80
+  // попыток и не выпасть, а здесь регрессия видна наверняка.
+  let op = 0, opK = 0;
+  const worst = {};
+  for (const w of ['w','m']) {
+    who = w;
+    for (const meal of ['Завтрак','Обед','Ужин','Перекус']) {
+      const aim = aimFor(meal);
+      for (let i = 0; i < 400; i++) {
+        const r = assembleDish(meal);
+        if (!r) continue;
+        const s = sumOf(r.items);
+        if (s.p > aim.p * 1.6) { op++; worst[r.tpl.id] = Math.max(worst[r.tpl.id] || 0, Math.round(s.p)); }
+        if (Math.abs(s.k - aim.k) > aim.k * 0.15) opK++;
+      }
+    }
+  }
+  if (op) console.log('  перебор белка:', JSON.stringify(worst));
+  console.log('на 3200 сборок — переборов белка:', op, ', мимо калорий:', opK);
+
   // свои продукты
   let fp = 0;
   const set = (id, v) => { document.getElementById(id).value = v; };
