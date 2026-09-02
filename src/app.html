@@ -403,19 +403,22 @@ summary::-webkit-details-marker{display:none}
      должна быть под большим пальцем, а не отжимать контент вниз. */
   .shell{display:block; max-width:none; padding:10px 10px calc(78px + env(safe-area-inset-bottom))}
   .main{gap:10px}
-  .side{position:fixed; left:0; right:0; bottom:0; z-index:40; display:block;
+  .side{position:fixed; left:0; right:0; bottom:0; top:auto; z-index:40; display:block;
     padding:5px 0 calc(5px + env(safe-area-inset-bottom)); border-radius:0;
     border:none; border-top:1px solid var(--line); box-shadow:0 -6px 20px -12px rgba(0,0,0,.35)}
   .side .brand,.side .who-switch,.side .promo{display:none}
   .nav{flex-direction:row; overflow-x:auto; gap:0; padding:0 6px; scrollbar-width:none}
   .nav::-webkit-scrollbar{display:none}
-  .nav button{flex:0 0 auto; flex-direction:column; align-items:center; gap:3px;
+  .nav button{flex:0 0 auto; width:auto; flex-direction:column; align-items:center; gap:3px; text-align:center;
     min-width:64px; padding:7px 8px 6px; font-size:10px; letter-spacing:-.01em; border-radius:10px}
   .nav button svg{display:block; width:20px; height:20px; opacity:.9}
   .nav .count{display:none}
 
-  .topbar{position:sticky; top:0; z-index:30; padding:11px 13px; gap:9px; margin:-10px -10px 0; border-radius:0 0 var(--r) var(--r)}
-  .topbar h1{font-size:19px; flex:1 1 auto}
+  .topbar{position:sticky; top:0; z-index:30; padding:10px 12px; gap:7px; margin:-10px -10px 0; border-radius:0 0 var(--r) var(--r)}
+  .topbar h1{font-size:18px; flex:1 1 auto; min-width:0}
+  .theme-seg{padding:2px; gap:1px}
+  .theme-seg button{width:26px; height:24px}
+  .segm button{padding:5px 10px; font-size:11.5px}
   .topbar .sub{display:none}
   .search{order:5; flex:1 1 100%; max-width:none}
   .segm{display:grid}
@@ -747,7 +750,7 @@ const SIDE_OK = ['хлеб','хлебец','банан','яблоко','орех
                  'шоколад 85%','шоколад 72%','зефир','пастила','мармелад'];
 
 const DISHES = [
-  { id:'skillet', title:'{main} с овощами на сковороде', meals:['Обед','Ужин'], gear:'сковорода', time:'20 минут',
+  { id:'skillet', short:'Жаркое на сковороде', title:'{main} с овощами на сковороде', meals:['Обед','Ужин'], gear:'сковорода', time:'20 минут',
     slots:[
       {r:'main', only:MEAT, base:160, lo:80, hi:320, req:true, flex:true},
       {r:'veg', cat:'Овощи', not:['капуста квашеная','горошек конс.','кукуруза конс.'], base:150, lo:80, hi:260, req:true, flex:true},
@@ -761,7 +764,7 @@ const DISHES = [
       S.grn ? `Гарнир: ${q(S.grn)} в готовом виде.` : 'Гарнира тут нет — порция целиком из мяса и овощей.'
     ] },
 
-  { id:'stew', title:'{main} с грибами в мультиварке', meals:['Обед','Ужин'], gear:'мультиварка', time:'40 минут, из них 10 активных',
+  { id:'stew', short:'Тушёное с грибами', title:'{main} с грибами в мультиварке', meals:['Обед','Ужин'], gear:'мультиварка', time:'40 минут, из них 10 активных',
     slots:[
       {r:'main', only:MEAT, base:170, lo:80, hi:320, req:true, flex:true},
       {r:'mush', only:['шампиньоны'], base:150, lo:80, hi:300, req:true, flex:true},
@@ -776,7 +779,7 @@ const DISHES = [
       S.grn ? `Гарнир: ${q(S.grn)}.` : 'Есть как есть — мясо с грибами уже даёт полноценную порцию.'
     ] },
 
-  { id:'omelet', title:'Омлет с {veg:1}', meals:['Завтрак','Ужин'], gear:'сковорода', time:'10 минут',
+  { id:'omelet', short:'Омлет', title:'Омлет с {veg:1}', meals:['Завтрак','Ужин'], gear:'сковорода', time:'10 минут',
     slots:[
       {r:'main', only:['яйцо'], base:110, lo:55, hi:275, req:true, flex:true},
       {r:'veg', only:['помидор','шампиньоны','кабачок','перец сладкий','брокколи','лук','капуста'], base:120, lo:60, hi:220, req:true, flex:true},
@@ -791,7 +794,7 @@ const DISHES = [
       S.cheese ? `За минуту до готовности посыпать: ${q(S.cheese)}.` : 'Готово, когда верх схватился и перестал блестеть.'
     ] },
 
-  { id:'porridge', title:'Овсянка на молоке с {fruit:1}', meals:['Завтрак'], gear:'мультиварка или кастрюля', time:'15 минут',
+  { id:'porridge', short:'Овсянка на молоке', title:'Овсянка на молоке с {fruit:1}', meals:['Завтрак'], gear:'мультиварка или кастрюля', time:'15 минут',
     slots:[
       {r:'oat', only:['хлопья овсяные'], base:50, lo:25, hi:90, req:true, flex:true},
       {r:'milk', only:['молоко 2,5%','молоко 1,5%'], base:150, lo:80, hi:300, req:true, flex:true},
@@ -805,7 +808,7 @@ const DISHES = [
       `Сверху: ${q(S.fruit)}${S.seed ? ', ' + q(S.seed) : ''}. Корица по вкусу.`
     ] },
 
-  { id:'bowl', title:'Боул с {main:1}', meals:['Обед','Ужин'], gear:'без техники', time:'10 минут',
+  { id:'bowl', short:'Боул', title:'Боул с {main:1}', meals:['Обед','Ужин'], gear:'без техники', time:'10 минут',
     slots:[
       {r:'main', only:['тунец с/с','яйцо','филе куриное','нут отв.','творог 5%'], base:120, lo:60, hi:220, req:true, flex:true},
       {r:'veg', only:['помидор','огурец','капуста','морковь','перец сладкий'], base:150, lo:80, hi:280, req:true, flex:true},
@@ -820,7 +823,7 @@ const DISHES = [
       S.grn ? `Рядом: ${q(S.grn)}.` : 'Готово.'
     ] },
 
-  { id:'soup', title:'Суп с {main:1}', meals:['Обед'], gear:'мультиварка', time:'40 минут, из них 10 активных',
+  { id:'soup', short:'Суп', title:'Суп с {main:1}', meals:['Обед'], gear:'мультиварка', time:'40 минут, из них 10 активных',
     slots:[
       {r:'main', only:MEAT, base:140, lo:70, hi:280, req:true, flex:true},
       {r:'pot', only:['картофель отв.','нут отв.','гречка гот.','рис гот.'], base:150, lo:60, hi:280, req:true, flex:true},
@@ -834,7 +837,7 @@ const DISHES = [
       'Режим «Тушение» — 30 минут. Суп живёт трое суток и на вторые вкуснее.'
     ] },
 
-  { id:'fishbake', title:'Минтай под овощами', meals:['Обед','Ужин'], gear:'духовка', time:'35 минут, из них 10 активных',
+  { id:'fishbake', short:'Рыба под овощами', title:'Минтай под овощами', meals:['Обед','Ужин'], gear:'духовка', time:'35 минут, из них 10 активных',
     slots:[
       {r:'main', only:['минтай','треска'], base:180, lo:90, hi:320, req:true, flex:true},
       {r:'veg', only:['морковь','лук','помидор','шампиньоны','кабачок'], base:150, lo:80, hi:260, req:true, flex:true},
@@ -849,7 +852,7 @@ const DISHES = [
       S.grn ? `Гарнир: ${q(S.grn)}.` : 'Готово.'
     ] },
 
-  { id:'waffles', title:'Протеиновые вафли', meals:['Завтрак'], gear:'мультипекарь', time:'20 минут',
+  { id:'waffles', short:'Протеиновые вафли', title:'Протеиновые вафли', meals:['Завтрак'], gear:'мультипекарь', time:'20 минут',
     slots:[
       {r:'oat', only:['хлопья овсяные'], base:45, lo:25, hi:80, req:true, flex:true},
       {r:'curd', only:['творог 5%'], base:90, lo:50, hi:180, req:true, flex:true},
@@ -864,7 +867,7 @@ const DISHES = [
       S.top ? `Сверху: ${q(S.top)}.` : 'Остужать на решётке, а не стопкой, иначе отсыреют.'
     ] },
 
-  { id:'toast', title:'Тост с {main:1}', meals:['Завтрак','Перекус'], gear:'тостер', time:'5 минут',
+  { id:'toast', short:'Тост', title:'Тост с {main:1}', meals:['Завтрак','Перекус'], gear:'тостер', time:'5 минут',
     slots:[
       {r:'bread', only:['хлеб','хлебец'], base:50, lo:20, hi:150, req:true, flex:true},
       {r:'main', only:['яйцо','творожный сыр','сыр лёгкий','тунец с/с','филе куриное','творог 5%'], base:60, lo:25, hi:110, req:true, flex:true},
@@ -878,7 +881,7 @@ const DISHES = [
       S.seed ? `Присыпать: ${q(S.seed)}.` : 'Есть сразу, пока хрустит.'
     ] },
 
-  { id:'chickpea', title:'Хрустящий нут', meals:['Перекус'], gear:'духовка', time:'25 минут',
+  { id:'chickpea', short:'Хрустящий нут', title:'Хрустящий нут', meals:['Перекус'], gear:'духовка', time:'25 минут',
     slots:[
       {r:'main', only:['нут отв.'], base:90, lo:40, hi:180, req:true, flex:true},
       {r:'oil', only:['масло раст.'], base:4, lo:2, hi:8},
@@ -892,7 +895,7 @@ const DISHES = [
     ] },
 
   /* ---- десерты ---- */
-  { id:'curdcream', title:'Творожный крем с бананом', meals:['Завтрак','Перекус'], gear:'без техники', time:'5 минут',
+  { id:'curdcream', short:'Творожный крем', title:'Творожный крем с бананом', meals:['Завтрак','Перекус'], gear:'без техники', time:'5 минут',
     slots:[
       {r:'curd', only:['творог 5%'], base:120, lo:60, hi:220, req:true, flex:true},
       {r:'yog', only:['йогурт греческий','сметана 15%'], base:60, lo:25, hi:120, req:true, flex:true},
@@ -906,7 +909,7 @@ const DISHES = [
       'Дать постоять 10 минут в холодильнике — крем схватится.'
     ] },
 
-  { id:'berrybowl', title:'Ягодный боул с шоколадом', meals:['Перекус'], gear:'микроволновка', time:'5 минут',
+  { id:'berrybowl', short:'Ягодный боул', title:'Ягодный боул с шоколадом', meals:['Перекус'], gear:'микроволновка', time:'5 минут',
     slots:[
       {r:'curd', only:['творог 5%'], base:130, lo:70, hi:220, req:true, flex:true},
       {r:'yog', only:['йогурт греческий','сметана 15%'], base:50, lo:20, hi:110, req:true, flex:true},
@@ -920,7 +923,7 @@ const DISHES = [
       S.choc ? `${cap(q(S.choc))} натереть или наломать поверх.` : 'Готово.'
     ] },
 
-  { id:'gelato', title:'Джелато в мороженице', meals:['Перекус'], gear:'мороженица', time:'15 минут + охлаждение базы',
+  { id:'gelato', short:'Джелато', title:'Джелато в мороженице', meals:['Перекус'], gear:'мороженица', time:'15 минут + охлаждение базы',
     slots:[
       {r:'base', only:['йогурт греческий','кефир 1%','молоко 2,5%','молоко 1,5%'], base:180, lo:100, hi:300, req:true, flex:true},
       {r:'curd', only:['творог 5%'], base:80, lo:40, hi:160, req:true, flex:true},
@@ -934,7 +937,7 @@ const DISHES = [
       'Есть сразу: без стабилизаторов домашнее джелато через час в морозилке становится камнем.'
     ] },
 
-  { id:'shake', title:'Протеиновый шейк', meals:['Перекус'], gear:'блендер', time:'3 минуты',
+  { id:'shake', short:'Протеиновый шейк', title:'Протеиновый шейк', meals:['Перекус'], gear:'блендер', time:'3 минуты',
     slots:[
       {r:'milk', only:['молоко 2,5%','молоко 1,5%','кефир 1%'], base:200, lo:100, hi:320, req:true, flex:true},
       {r:'prot', only:['протеин'], base:25, lo:12, hi:40, req:true, flex:true},
@@ -947,7 +950,7 @@ const DISHES = [
       S.fruit && S.fruit.n === 'ягоды заморож.' ? 'Замороженные ягоды класть не размораживая — шейк выйдет холодным без льда.' : 'Пить сразу, иначе расслоится.'
     ] },
 
-  { id:'curdbake', title:'Творожная запеканка', meals:['Завтрак'], gear:'духовка', time:'45 минут, из них 10 активных',
+  { id:'curdbake', short:'Творожная запеканка', title:'Творожная запеканка', meals:['Завтрак'], gear:'духовка', time:'45 минут, из них 10 активных',
     slots:[
       {r:'curd', only:['творог 5%'], base:200, lo:120, hi:320, req:true, flex:true},
       {r:'egg', only:['яйцо'], base:55, lo:55, hi:165, req:true, flex:true},
@@ -1099,7 +1102,7 @@ function pageCons(){
     (asSide.length ? `<div class="side-h"><span>Вприкуску</span><i></i></div>
        <div class="res-list">${asSide.map(([x,i]) => compRow(x,i)).join('')}</div>` : '') +
     (recipe ? (recipe.broken
-      ? `<div class="howto"><h4>${svg('pan')}Как приготовить</h4><p style="font-size:13px;color:var(--ink2)">Состав изменён так, что рецепт «${esc(builtTpl.title.replace(/\{[^}]+\}/g,'…'))}» больше не собирается — не хватает обязательного компонента. Нажмите «Собрать» заново или верните убранное.</p></div>`
+      ? `<div class="howto"><h4>${svg('pan')}Как приготовить</h4><p style="font-size:13px;color:var(--ink2)">Состав изменён так, что рецепт «${esc(builtTpl.short)}» больше не собирается — не хватает обязательного компонента. Нажмите «Собрать» заново или верните убранное.</p></div>`
       : `<div class="howto"><h4>${svg('pan')}Как приготовить</h4><ol>${recipe.steps.map(t => `<li>${esc(t)}</li>`).join('')}</ol></div>`) : '')
   ) : `<p class="empty"><b>Пусто</b>Отметьте продукты справа и нажмите «Собрать» — получите блюдо с навеской и порядком готовки.</p>`;
 
@@ -1133,7 +1136,7 @@ function pageCons(){
     </div>
     ${menuDishes.length ? `<div class="dish-pick">
       <span class="lbl" style="align-self:center;margin-right:2px">Или конкретное блюдо:</span>
-      ${menuDishes.map(t => `<button type="button" data-dish="${t.id}" aria-pressed="${builtTpl && builtTpl.id === t.id}">${esc(t.title.replace(/\{[^}]+\}/g, '…'))}</button>`).join('')}
+      ${menuDishes.map(t => `<button type="button" data-dish="${t.id}" aria-pressed="${builtTpl && builtTpl.id === t.id}">${esc(t.short)}</button>`).join('')}
     </div>` : ''}
     <div class="cons">
       <div>
