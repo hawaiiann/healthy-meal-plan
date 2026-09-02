@@ -167,6 +167,37 @@ button{font:inherit; color:inherit; border:none; background:none; cursor:pointer
 .pline .rm svg{width:11px; height:11px}
 .mine{display:inline-block; width:5px; height:5px; border-radius:50%; background:var(--lime-d); flex:0 0 auto}
 
+/* ---------- замены в дне ---------- */
+.meal.sw{border-color:var(--lime); background:var(--lime-soft)}
+.swap-btn{display:inline-flex; align-items:center; gap:5px; padding:4px 9px; border-radius:99px;
+  border:1px solid var(--line-c); background:var(--card); color:var(--ink3);
+  font-family:Nunito,sans-serif; font-size:10.5px; font-weight:700; white-space:nowrap}
+.swap-btn:hover{background:var(--lime); color:var(--on-lime); border-color:var(--lime)}
+.swap-btn svg{width:12px; height:12px}
+.swap-btn[aria-expanded="true"]{background:var(--lime); color:var(--on-lime); border-color:var(--lime)}
+.swp{grid-column:1 / -1; margin-top:10px; padding:13px; background:var(--card);
+  border:1px solid var(--line); border-radius:var(--r2); display:flex; flex-direction:column; gap:12px}
+.swp-g{display:flex; flex-direction:column; gap:6px}
+.swp-g > .lbl{display:flex; align-items:center; gap:7px}
+.swp-g > .lbl i{flex:1 1 auto; height:1px; background:var(--line); display:block}
+.opt{display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:center; width:100%;
+  padding:9px 11px; background:var(--soft); border:1px solid var(--line); border-radius:var(--r3); text-align:left}
+.opt:hover{border-color:var(--lime); background:var(--lime-soft)}
+.opt h5{font-size:13px; font-weight:700; line-height:1.25}
+.opt .s{font-size:11px; color:var(--ink3); margin-top:2px; line-height:1.35}
+.opt .kk{font-family:"JetBrains Mono",monospace; font-size:12px; font-weight:700; color:var(--ink2); white-space:nowrap}
+.subs{display:flex; flex-wrap:wrap; gap:5px}
+.subs .src{font-size:11.5px; color:var(--ink2); padding:4px 0; width:100%}
+.subs .src b{font-weight:700; color:var(--ink)}
+.sub-b{padding:5px 10px; border-radius:99px; border:1px solid var(--line-c); background:var(--mint);
+  font-size:11.5px; color:var(--ink2)}
+.sub-b:hover{background:var(--lime); color:var(--on-lime); border-color:var(--lime)}
+.sub-b b{font-family:"JetBrains Mono",monospace; font-weight:700}
+.swapped-tag{font-family:Nunito,sans-serif; font-size:9.5px; font-weight:700; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--kcal); background:var(--card); border:1px solid var(--lime);
+  padding:2px 7px; border-radius:99px}
+.mini-steps{margin:0; padding-left:17px; font-size:11.5px; color:var(--ink2); display:flex; flex-direction:column; gap:4px}
+
 /* ---------- блюдо ---------- */
 .dish-h{display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:14px 15px;
   background:var(--lime-soft); border:1px solid var(--lime); border-radius:var(--r2); margin-bottom:11px}
@@ -549,6 +580,7 @@ const ICON = {
   sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon:'<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/>',
   auto:'<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor" stroke="none"/>',
+  swap:'<path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/>',
   pan:'<path d="M3 11h13a5 5 0 0 1 0 10H8a5 5 0 0 1-5-5z"/><path d="M16 13h3.5a2 2 0 0 0 0-4H18"/><path d="M7 7.5c0-1.5 1.5-1.5 1.5-3M11 7.5c0-1.5 1.5-1.5 1.5-3"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
   x:'<path d="M6 6l12 12M18 6 6 18"/>'
@@ -651,6 +683,9 @@ if(!pantry || typeof pantry !== 'object') pantry = {};
 PLAN.foods.forEach(f => { if(!(f.n in pantry)) pantry[f.n] = f.on; });
 let built = [];
 let builtTpl = null;
+let swaps = store.get('kotel.swaps', {}) || {};
+if(typeof swaps !== 'object') swaps = {};
+let openSwap = null;
 let consNote = '';
 let aimMeal = 'Обед';
 let theme = ['auto','light','dark'].includes(store.get('kotel.theme','auto')) ? store.get('kotel.theme','auto') : 'auto';
@@ -984,6 +1019,187 @@ const DISHES = [
       `Смешать с ${qi(S.curd)}${S.fruit ? ', добавить: ' + q(S.fruit) : ''}. Яйца (${gOf(S.egg)}) разделить, желтки — в тесто.`,
       'Белки взбить отдельно до мягких пиков и вмешать лопаткой сверху вниз.',
       'Форма, 180 °C, 35 минут до сухой зубочистки. Резать полностью остывшей.'
+    ] },
+
+  { id:'syrniki', short:'Сырники', title:'Сырники', meals:['Завтрак'], gear:'сковорода', time:'15 минут',
+    slots:[
+      {r:'curd', only:['творог 5%'], base:180, lo:100, hi:300, req:true, flex:true},
+      {r:'egg', only:['яйцо'], base:55, lo:55, hi:110, req:true, flex:true},
+      {r:'oat', only:['хлопья овсяные'], base:30, lo:15, hi:60, req:true, flex:true},
+      {r:'add', only:['изюм','яблоко','банан','ягоды заморож.'], base:40, lo:15, hi:90, flex:true},
+      {r:'top', only:['сметана 15%','йогурт греческий','мёд'], base:30, lo:10, hi:70, flex:true},
+      {r:'oil', only:['масло раст.'], base:4, lo:2, hi:8}
+    ],
+    steps:S=>[
+      `${cap(q(S.oat))} смолоть в муку. ${cap(q(S.curd))} размять и смешать с ${qi(S.egg)} и мукой${S.add ? ', вмешать ' + qi(S.add) : ''}.`,
+      'Тесто убрать в холод на 10 минут — тёплое расползается на сковороде.',
+      `Мокрыми руками слепить шайбы толщиной 1,5 см, обжарить на ${S.oil ? gOf(S.oil) + ' масла' : 'сухой сковороде'} по 3 минуты с каждой стороны под крышкой.`,
+      S.top ? `Подать с ${qi(S.top)}.` : 'Готово.'
+    ] },
+
+  { id:'oatpan', short:'Овсяноблин', title:'Овсяноблин с {fill:1}', meals:['Завтрак','Ужин'], gear:'сковорода', time:'10 минут',
+    slots:[
+      {r:'oat', only:['хлопья овсяные'], base:40, lo:20, hi:70, req:true, flex:true},
+      {r:'egg', only:['яйцо'], base:55, lo:55, hi:110, req:true, flex:true},
+      {r:'fill', only:['творожный сыр','сыр лёгкий','творог 5%','тунец с/с','филе куриное'], base:50, lo:20, hi:120, req:true, flex:true},
+      {r:'milk', only:['молоко 2,5%','молоко 1,5%','кефир 1%'], base:40, lo:20, hi:90, flex:true},
+      {r:'veg', only:['помидор','огурец','перец сладкий'], base:60, lo:30, hi:130, flex:true}
+    ],
+    steps:S=>[
+      `${cap(q(S.oat))} смолоть, смешать с ${qi(S.egg)}${S.milk ? ' и ' + qi(S.milk) : ''}, посолить. Дать постоять 5 минут.`,
+      'Вылить на разогретую сухую сковороду тонким блином, жарить 3 минуты под крышкой.',
+      `Перевернуть, на одну половину выложить: ${q(S.fill)}${S.veg ? ', ' + q(S.veg) : ''}.`,
+      'Сложить пополам, ещё минута — и снимать.'
+    ] },
+
+  { id:'lazy', short:'Ленивые вареники', title:'Ленивые вареники', meals:['Завтрак','Ужин'], gear:'кастрюля', time:'20 минут',
+    slots:[
+      {r:'curd', only:['творог 5%'], base:200, lo:120, hi:320, req:true, flex:true},
+      {r:'egg', only:['яйцо'], base:55, lo:55, hi:110, req:true, flex:true},
+      {r:'oat', only:['хлопья овсяные'], base:40, lo:20, hi:70, req:true, flex:true},
+      {r:'top', only:['сметана 15%','йогурт греческий','ягоды заморож.','мёд'], base:40, lo:15, hi:90, flex:true}
+    ],
+    steps:S=>[
+      `${cap(q(S.oat))} смолоть в муку, смешать с ${qi(S.curd)} и ${qi(S.egg)}, чуть посолить.`,
+      'Скатать колбаску, нарезать наискось кусочками по 2 см.',
+      'Опускать в кипящую подсоленную воду. Готовы, когда всплыли — это минуты три, не больше.',
+      S.top ? `Подать с ${qi(S.top)}.` : 'Готово.'
+    ] },
+
+  { id:'steamcutlet', short:'Паровые котлеты', title:'Паровые котлеты', meals:['Обед','Ужин'], gear:'мультиварка', time:'40 минут, из них 15 активных',
+    slots:[
+      {r:'main', only:['фарш куриный','фарш индейки','фарш говяжий'], base:180, lo:90, hi:300, req:true, flex:true},
+      {r:'veg', only:['кабачок','капуста','морковь','лук'], base:100, lo:50, hi:180, req:true, flex:true},
+      {r:'oat', only:['хлопья овсяные'], base:25, lo:10, hi:45, flex:true},
+      {r:'egg', only:['яйцо'], base:55, lo:55, hi:55},
+      {r:'grn', cat:'Гарниры', not:['хлеб','хлебец','хлопья овсяные'], base:130, lo:50, hi:260, flex:true}
+    ],
+    steps:S=>[
+      `${cap(q(S.veg))} натереть и отжать досуха — это вместо хлеба и жира, сочность даёт он, а калорий почти не приносит.`,
+      `Вымесить с ${qi(S.main)}${S.oat ? ', ' + qi(S.oat) : ''}${S.egg ? ', ' + qi(S.egg) : ''}, посолить и отбить об миску.`,
+      'Шарики по 45 г в паровую корзину, вода в чаше, режим «Пар» — 30 минут.',
+      S.grn ? `Гарнир: ${q(S.grn)}.` : 'Хранятся трое суток, отлично мёрзнут сырыми.'
+    ] },
+
+  { id:'fishcutlet', short:'Рыбные котлеты', title:'Котлеты из минтая', meals:['Обед','Ужин'], gear:'сковорода', time:'25 минут',
+    slots:[
+      {r:'main', only:['минтай','треска'], base:220, lo:120, hi:350, req:true, flex:true},
+      {r:'veg', only:['лук','морковь','кабачок'], base:80, lo:40, hi:150, req:true, flex:true},
+      {r:'oat', only:['хлопья овсяные','хлеб'], base:30, lo:15, hi:60, flex:true},
+      {r:'egg', only:['яйцо'], base:55, lo:55, hi:55},
+      {r:'grn', cat:'Гарниры', not:['хлеб','хлебец','хлопья овсяные'], base:130, lo:50, hi:260, flex:true},
+      {r:'oil', only:['масло раст.'], base:5, lo:3, hi:10}
+    ],
+    steps:S=>[
+      `${cap(q(S.main))} и ${q(S.veg)} пробить блендером или пропустить через мясорубку.`,
+      `Добавить: ${S.oat ? q(S.oat) : 'ложку муки'}${S.egg ? ', ' + q(S.egg) : ''}. Посолить, поперчить, дать постоять 10 минут — фарш из рыбы водянистый и должен схватиться.`,
+      `Жарить на ${S.oil ? gOf(S.oil) + ' масла' : 'сухой сковороде'} по 4 минуты с каждой стороны, последние 5 минут под крышкой.`,
+      S.grn ? `Гарнир: ${q(S.grn)}.` : 'Готово.'
+    ] },
+
+  { id:'ragu', short:'Овощное рагу с фаршем', title:'Рагу с {main:1}', meals:['Обед','Ужин'], gear:'мультиварка', time:'45 минут, из них 10 активных',
+    slots:[
+      {r:'main', only:['фарш куриный','фарш индейки','фарш говяжий','филе куриное'], base:170, lo:80, hi:300, req:true, flex:true},
+      {r:'veg', only:['кабачок','перец сладкий','капуста','брокколи'], base:180, lo:80, hi:300, req:true, flex:true},
+      {r:'veg2', only:['морковь','лук','помидор'], base:120, lo:60, hi:200, flex:true},
+      {r:'pot', only:['картофель отв.','нут отв.','рис гот.'], base:150, lo:60, hi:280, flex:true},
+      {r:'sauce', only:['томатная паста'], base:25, lo:10, hi:45},
+      {r:'oil', only:['масло раст.'], base:5, lo:3, hi:10}
+    ],
+    steps:S=>[
+      `Режим «Жарка»${S.oil ? ' с ' + qi(S.oil) : ''}: ${q(S.veg2 || S.veg)} — 5 минут.`,
+      `Добавить: ${q(S.main)}. Обжарить до изменения цвета.`,
+      `Заложить: ${q(S.veg)}${S.pot ? ', ' + q(S.pot) : ''}${S.sauce ? ', ' + q(S.sauce) : ''}. Полстакана воды, соль, лавровый лист.`,
+      'Режим «Тушение» — 35 минут. Воды лить мало: овощи дадут свою.'
+    ] },
+
+  { id:'cabbagestew', short:'Тушёная капуста с фаршем', title:'Тушёная капуста с {main:1}', meals:['Обед','Ужин'], gear:'мультиварка', time:'50 минут, из них 10 активных',
+    slots:[
+      {r:'main', only:['фарш куриный','фарш индейки','фарш говяжий'], base:170, lo:80, hi:300, req:true, flex:true},
+      {r:'cab', only:['капуста'], base:280, lo:150, hi:450, req:true, flex:true},
+      {r:'veg', only:['морковь','лук'], base:110, lo:50, hi:200, flex:true},
+      {r:'sauce', only:['томатная паста'], base:25, lo:10, hi:45},
+      {r:'grn', only:['картофель отв.','гречка гот.','хлеб'], base:120, lo:40, hi:250, flex:true},
+      {r:'oil', only:['масло раст.'], base:5, lo:3, hi:10}
+    ],
+    steps:S=>[
+      `Режим «Жарка»${S.oil ? ' с ' + qi(S.oil) : ''}: ${q(S.veg || S.main)} — 5 минут, следом фарш до рассыпчатости.`,
+      `Заложить: ${q(S.cab)} шинкованную${S.sauce ? ', ' + q(S.sauce) : ''}. Кажется, что не влезет — влезет: капуста ужаривается вдвое.`,
+      'Полстакана воды, тмин, соль. Режим «Тушение» — 40 минут.',
+      S.grn ? `Гарнир: ${q(S.grn)}.` : 'На второй день вкуснее.'
+    ] },
+
+  { id:'tunarice', short:'Рис с тунцом', title:'Рис с тунцом и горошком', meals:['Обед','Ужин'], gear:'без техники', time:'10 минут',
+    slots:[
+      {r:'main', only:['тунец с/с'], base:120, lo:60, hi:220, req:true, flex:true},
+      {r:'grn', only:['рис гот.','гречка гот.','булгур гот.','перловка гот.'], base:150, lo:60, hi:280, req:true, flex:true},
+      {r:'can', only:['горошек конс.','кукуруза конс.'], base:100, lo:40, hi:180, flex:true},
+      {r:'veg', only:['огурец','помидор','лук','перец сладкий'], base:100, lo:50, hi:180, flex:true},
+      {r:'oil', only:['масло раст.'], base:6, lo:3, hi:12}
+    ],
+    steps:S=>[
+      `${cap(q(S.main))} размять вилкой прямо в банке, жидкость слить.`,
+      `Смешать с ${qi(S.grn)}${S.can ? ' и ' + qi(S.can) : ''}.`,
+      S.veg ? `Добавить: ${q(S.veg)} кубиком.` : 'Посолить, поперчить.',
+      S.oil ? `Заправить ${qi(S.oil)}, добавить лимон.` : 'Заправить лимоном.'
+    ] },
+
+  { id:'friedeggs', short:'Яичница с овощами', title:'Яичница с {veg:1}', meals:['Завтрак','Ужин'], gear:'сковорода', time:'8 минут',
+    slots:[
+      {r:'main', only:['яйцо'], base:110, lo:55, hi:220, req:true, flex:true},
+      {r:'veg', only:['помидор','перец сладкий','шампиньоны','кабачок'], base:120, lo:60, hi:220, req:true, flex:true},
+      {r:'bread', only:['хлеб','хлебец'], base:50, lo:20, hi:110, flex:true},
+      {r:'cheese', only:['сыр лёгкий','творожный сыр'], base:25, lo:10, hi:50, flex:true},
+      {r:'oil', only:['масло раст.'], base:4, lo:2, hi:8}
+    ],
+    steps:S=>[
+      `${cap(q(S.veg))} нарезать и обжарить ${S.oil ? 'на ' + gOf(S.oil) + ' масла' : 'на сухой сковороде'} 3 минуты.`,
+      `Разбить сверху ${q(S.main)}, не размешивая. Огонь убавить, накрыть крышкой — так белок схватится, а желток останется жидким.`,
+      S.cheese ? `За минуту до конца: ${q(S.cheese)}.` : 'Соль, перец в конце, а не в начале — соль на желтке оставляет белые точки.',
+      S.bread ? `Подать с: ${q(S.bread)}.` : 'Готово.'
+    ] },
+
+  { id:'milkgrain', short:'Каша на молоке', title:'{grn} на молоке', meals:['Завтрак'], gear:'кастрюля', time:'10 минут',
+    slots:[
+      {r:'grn', only:['гречка гот.','рис гот.','булгур гот.'], base:150, lo:70, hi:280, req:true, flex:true},
+      {r:'milk', only:['молоко 2,5%','молоко 1,5%'], base:180, lo:80, hi:320, req:true, flex:true},
+      {r:'fruit', cat:'Фрукты', base:90, lo:30, hi:180, flex:true},
+      {r:'prot', only:['протеин'], base:18, lo:8, hi:35, flex:true},
+      {r:'add', only:['мёд','орех грецкий','семечки тыквенные','чиа'], base:10, lo:5, hi:25, flex:true}
+    ],
+    steps:S=>[
+      `${cap(q(S.grn))} залить ${qi(S.milk)} и прогреть 5 минут на слабом огне, помешивая.`,
+      S.prot ? `Снять с огня, остудить до тёплого и вмешать ${qi(S.prot)} — в горячем он свернётся.` : 'Снять с огня, дать постоять под крышкой 3 минуты.',
+      `Сверху: ${S.fruit ? q(S.fruit) : 'корица'}${S.add ? ', ' + q(S.add) : ''}.`
+    ] },
+
+  { id:'bakedapple', short:'Печёное яблоко', title:'Печёное яблоко с творогом', meals:['Перекус'], gear:'духовка или микроволновка', time:'20 минут',
+    slots:[
+      {r:'fruit', only:['яблоко'], base:180, lo:100, hi:280, req:true, flex:true},
+      {r:'curd', only:['творог 5%'], base:70, lo:30, hi:150, req:true, flex:true},
+      {r:'add', only:['изюм','орех грецкий','какао','мёд','чиа'], base:12, lo:5, hi:30, flex:true}
+    ],
+    steps:S=>[
+      `У ${gOf(S.fruit)} яблок срезать крышечку и вынуть сердцевину, не протыкая дно — иначе начинка вытечет.`,
+      `Начинить: ${q(S.curd)}${S.add ? ', ' + q(S.add) : ''}, корица.`,
+      'Духовка 180 °C, 20 минут. В микроволновке — 4 минуты на полной мощности.',
+      'Есть тёплым: остывшее яблоко становится водянистым.'
+    ] },
+
+  { id:'vegbake', short:'Овощная запеканка', title:'Овощная запеканка с сыром', meals:['Обед','Ужин'], gear:'духовка', time:'50 минут, из них 15 активных',
+    slots:[
+      {r:'veg', only:['кабачок','брокколи','капуста'], base:250, lo:120, hi:400, req:true, flex:true},
+      {r:'main', only:['яйцо'], base:165, lo:110, hi:275, req:true, flex:true},
+      {r:'veg2', only:['помидор','перец сладкий','лук','шампиньоны'], base:120, lo:60, hi:220, flex:true},
+      {r:'pot', only:['картофель отв.','рис гот.','гречка гот.'], base:130, lo:50, hi:250, flex:true},
+      {r:'cheese', only:['сыр лёгкий'], base:50, lo:20, hi:90, flex:true},
+      {r:'sauce', only:['сметана 15%','творожный сыр'], base:40, lo:15, hi:80, flex:true}
+    ],
+    steps:S=>[
+      `${cap(q(S.veg))} нарезать пластинами, посолить и дать постоять 10 минут, затем отжать — иначе запеканка потечёт.`,
+      `Взбить ${q(S.main)}${S.sauce ? ' со ' + qi(S.sauce) : ''}, посолить.`,
+      `Слоями в форму: овощи${S.veg2 ? ', ' + q(S.veg2) : ''}${S.pot ? ', ' + q(S.pot) : ''}, залить яичной смесью.`,
+      `Духовка 180 °C, 35 минут${S.cheese ? '. ' + cap(q(S.cheese)) + ' — на последние 10 минут' : ''}. Резать, дав постоять 10 минут.`
     ] }
 ];
 
@@ -995,7 +1211,28 @@ function slotPool(sl){
   return pool;
 }
 const dishFits = t => t.slots.every(sl => !sl.req || slotPool(sl).length > 0);
-function dishesFor(meal){ return DISHES.filter(t => t.meals.indexOf(meal) >= 0 && dishFits(t)); }
+
+/* Минимальная калорийность блюда: обязательные роли на нижней границе
+   навески, самым лёгким из доступных продуктов. Сырники физически не
+   влезают в перекус на 170 ккал — их не надо и предлагать. */
+function minKcal(t){
+  let sum = 0;
+  for(const sl of t.slots){
+    const pool = slotPool(sl);
+    if(!pool.length){ if(sl.req) return Infinity; continue; }
+    let best = Infinity;
+    for(const f of pool){
+      const g = f.unit ? Math.max(f.unit, sl.lo || 5) : (sl.lo || 5);
+      best = Math.min(best, f.k * g / 100);
+    }
+    sum += best;
+  }
+  return sum;
+}
+function dishesFor(meal, aimK){
+  const ceil = (aimK || aimFor(meal).k) * 1.05;
+  return DISHES.filter(t => t.meals.indexOf(meal) >= 0 && dishFits(t) && minKcal(t) <= ceil);
+}
 
 /* Подгонка калорий: на каждом проходе делаем один шаг — тот, что сильнее
    приближает к цели. Шаг «первый подходящий» застревал на штучных
@@ -1019,11 +1256,11 @@ function fitKcal(list, target){
   }
 }
 
-function assembleDish(meal, wantId){
-  const cands = wantId ? DISHES.filter(t => t.id === wantId && dishFits(t)) : dishesFor(meal);
+function assembleDish(meal, wantId, aimOverride){
+  const aim = aimOverride || aimFor(meal);
+  const cands = wantId ? DISHES.filter(t => t.id === wantId && dishFits(t)) : dishesFor(meal, aim.k);
   if(!cands.length) return null;
   const t = pick(cands);
-  const aim = aimFor(meal);
   const parts = [];
   for(const sl of t.slots){
     const pool = slotPool(sl);
@@ -1046,6 +1283,22 @@ function assembleDish(meal, wantId){
   }
   fitKcal(parts, aim.k);
 
+  /* Перебор даже на минимуме — снимаем необязательные компоненты, начиная
+     с самого калорийного. Иначе на сладкое в 90 ккал предлагалось джелато
+     с бананом и протеином на 167. */
+  for(let guard = 0; guard < 4; guard++){
+    if(sumOf(parts).k - aim.k <= aim.k * 0.08) break;
+    const optional = parts.filter(x => !t.slots.some(sl => sl.r === x.r && sl.req));
+    if(!optional.length) break;
+    let worst = null;
+    for(const x of optional){
+      const k = FOOD[x.n].k * x.g / 100;
+      if(!worst || k > worst.k) worst = { x, k };
+    }
+    parts.splice(parts.indexOf(worst.x), 1);
+    fitKcal(parts, aim.k);
+  }
+
   /* вприкуску: то, что не влезло в блюдо, но нужно по калориям */
   const side = [];
   const rest = aim.k - sumOf(parts).k;
@@ -1062,14 +1315,153 @@ function assembleDish(meal, wantId){
 }
 
 /* шаги готовки по текущему составу — пересчитываются после ручных правок */
-function dishSteps(){
-  if(!builtTpl) return null;
+function stepsFor(tpl, items){
+  if(!tpl) return null;
   const S = {};
-  for(const x of built) if(x.r && !x.side) S[x.r] = x;
-  const missing = builtTpl.slots.filter(sl => sl.req && !S[sl.r]);
-  if(missing.length) return { broken:true };
-  try { return { title: builtTpl.title.replace(/\{(\w+)(?::(\d))?\}/g, (_, r, c) => S[r] ? word(S[r].n, c ? +c : 0) : ''), steps: builtTpl.steps(S) }; }
+  for(const x of items) if(x.r && !x.side) S[x.r] = x;
+  if(tpl.slots.filter(sl => sl.req && !S[sl.r]).length) return { broken:true };
+  try { return { title: tpl.title.replace(/\{(\w+)(?::(\d))?\}/g, (_, r, c) => S[r] ? word(S[r].n, c ? +c : 0) : ''), steps: tpl.steps(S) }; }
   catch(e){ return { broken:true }; }
+}
+const dishById = id => DISHES.find(t => t.id === id) || null;
+function dishSteps(){ return builtTpl ? stepsFor(builtTpl, built) : null; }
+
+/* ================= замены в дне =================
+   План — не приговор: если продукта нет или блюдо надоело, приём меняется
+   на равный по калориям и белку. Замена живёт в браузере и отдельная
+   для каждого человека — порции у них разные. */
+
+const swapKey = (di, mi) => who + '|' + PLAN.days[di].id + '.' + mi;
+
+function parseQty(text){
+  return String(text).split(', ').map(t => {
+    const mm = t.match(/^(.*?)\s+(\d+(?:[.,]\d+)?)\s*(г|шт)$/);
+    if(!mm) return null;
+    const f = FOOD[mm[1].trim()];
+    if(!f) return null;
+    const num = parseFloat(mm[2].replace(',', '.'));
+    return { n: mm[1].trim(), g: mm[3] === 'шт' ? num * (f.unit || 1) : num, lo: 5, hi: 500, flex: true };
+  }).filter(Boolean);
+}
+const qtyText = items => items.map(x => word(x.n) + ' ' + gOf(x)).join(', ');
+
+function scaleParts(parts, targetK){
+  const cur = sumOf(parts).k;
+  if(cur > 0){
+    const f = targetK / cur;
+    for(const x of parts) x.g = roundG(FOOD[x.n], x.g * f);
+  }
+  fitKcal(parts, targetK);
+  return parts;
+}
+
+/* что стоит в приёме сейчас: план или уже поставленная замена */
+function mealView(di, mi){
+  const m = PLAN.days[di].meals[mi];
+  const sw = swaps[swapKey(di, mi)];
+  if(!sw || !sw.items || !sw.items.length)
+    return { title:m.title, note:m.note, label:m.label, qty:m[who].qty, v:m[who], swapped:false };
+  const s = sumOf(sw.items);
+  return {
+    title: sw.title, note: sw.note || '', label: m.label, qty: qtyText(sw.items),
+    v: { k:Math.round(s.k), p:Math.round(s.p), f:Math.round(s.f), c:Math.round(s.c) },
+    swapped: true, tplId: sw.tplId, items: sw.items, parts: sw.parts
+  };
+}
+function dayTotals(di){
+  return PLAN.days[di].meals.reduce((a, _, mi) => {
+    const v = mealView(di, mi).v;
+    a.k += v.k; a.p += v.p; a.f += v.f; a.c += v.c; return a;
+  }, {k:0, p:0, f:0, c:0});
+}
+
+/* варианты замены под КБЖУ именно этого приёма */
+function swapOptions(di, mi){
+  const m = PLAN.days[di].meals[mi];
+  const aim = { k: m[who].k, p: m[who].p };
+  const label = (m.label === 'Вечер' || m.label === 'Перекус') ? 'Перекус' : m.label;
+
+  const dishes = [], seen = new Set();
+  for(let t = 0; t < 120 && dishes.length < 3; t++){
+    const r = assembleDish(label, null, aim);
+    if(!r || seen.has(r.tpl.id)) continue;
+    const v = sumOf(r.items);
+    if(Math.abs(v.k - aim.k) > aim.k * 0.15) continue;
+    seen.add(r.tpl.id);
+    dishes.push({ tpl:r.tpl, items:r.items, v });
+  }
+
+  const small = aim.k <= 320;                 // размер перекуса, а не полноценного приёма
+  const bank = label === 'Перекус' ? PLAN.snacks.concat(PLAN.sweets) : PLAN.snacks;
+  const light = [];
+  for(const x of small ? bank : []){
+    const parts = parseQty(x.qty);
+    if(!parts.length) continue;
+    if(x.k > aim.k * 1.4 || x.k < aim.k * 0.7) continue;   // дальше растягивать — уже нелепо
+    const was = parts.map(y => y.g);
+    const items = scaleParts(parts, aim.k);
+    if(Math.abs(sumOf(items).k - aim.k) > aim.k * 0.15) continue;
+    if(items.some((y, i) => y.g > was[i] * 1.6 || y.g < was[i] * 0.55)) continue;
+    light.push({ title:x.title, items, note:x.note });
+    if(light.length >= 4) break;
+  }
+
+  /* два перекуса вместо одного: половина калорий на каждый */
+  let split = null;
+  const half = aim.k / 2;
+  const fit = small ? PLAN.snacks.filter(x => parseQty(x.qty).length && x.k <= half * 1.8 && x.k >= half * 0.5) : [];
+  if(fit.length >= 2){
+    const a = fit[Math.floor(Math.random() * fit.length)];
+    const rest = fit.filter(x => x.title !== a.title);
+    const b = rest[Math.floor(Math.random() * rest.length)];
+    const pa = parseQty(a.qty), pb = parseQty(b.qty);
+    const wa = pa.map(y => y.g), wb = pb.map(y => y.g);
+    split = [{ title:a.title, items:scaleParts(pa, half) },
+             { title:b.title, items:scaleParts(pb, half) }];
+    const tot = sumOf(split[0].items.concat(split[1].items)).k;
+    const wild = split[0].items.some((y, i) => y.g > wa[i] * 1.8 || y.g < wa[i] * 0.4) ||
+                 split[1].items.some((y, i) => y.g > wb[i] * 1.8 || y.g < wb[i] * 0.4);
+    if(Math.abs(tot - aim.k) > aim.k * 0.2 || wild) split = null;
+  }
+  return { aim, dishes, light, split };
+}
+
+/* чем заменить конкретный продукт: та же роль, равные калории,
+   а для белковых — равный белок, иначе замена ломает норму */
+function subsFor(name, grams){
+  const f = FOOD[name];
+  if(!f) return [];
+  if(f.k * grams / 100 < 25) return [];          // мелочь вроде 6 г какао заменять незачем
+  const byProtein = f.cat === 'Белок' && f.p >= 8;
+  const src = byProtein ? f.p * grams / 100 : f.k * grams / 100;
+  /* внутри белка держим подгруппу: творог меняется на йогурт, а не на фарш —
+     по граммам белка это одно и то же, а по смыслу в десерте нет мяса*/
+  const grp = n => /творог|йогурт|протеин|кефир|молоко|сыр|сметана/.test(n) ? 'молочное'
+    : /фарш|филе|бедро/.test(n) ? 'мясо'
+    : /минтай|треска|тунец|хек/.test(n) ? 'рыба'
+    : /яйцо/.test(n) ? 'яйцо' : 'прочее';
+  const g0 = grp(name);
+  const near = x => (grp(x.n) === g0 ? 0 : 100) +
+    Math.abs(x.p - f.p) + Math.abs(x.f - f.f) + Math.abs(x.c - f.c);
+  return allFoods()
+    .filter(x => x.n !== name && x.cat === f.cat && pantry[x.n] && (byProtein ? x.p >= 4 : x.k > 0))
+    .sort((a, b) => near(a) - near(b))            // сначала близкие по составу
+    .map(x => {
+      const g = roundG(x, byProtein ? src / (x.p / 100) : src / (x.k / 100));
+      return { n:x.n, g, k:Math.round(x.k * g / 100), p:Math.round(x.p * g / 100) };
+    })
+    .filter(x => x.g >= 5 && x.g <= 400)
+    .slice(0, 4);
+}
+
+function applySwap(di, mi, data){
+  swaps[swapKey(di, mi)] = data;
+  store.set('kotel.swaps', swaps);
+  openSwap = null;
+}
+function dropSwap(di, mi){
+  delete swaps[swapKey(di, mi)];
+  store.set('kotel.swaps', swaps);
 }
 
 function fromMeal(di, mi){
@@ -1308,12 +1700,13 @@ function pageHome(){
         <dt>Углеводы</dt><dd><b>${P.carb} г</b></dd>
         <dt>Темп</dt><dd>${P.rate}</dd>
       </dl></div>`;
-  const mx = Math.max(...PLAN.days.map(d=>d[who].k));
+  const DT = PLAN.days.map((d,i) => dayTotals(i).k);
+  const mx = Math.max(...DT);
   const bars = PLAN.days.map((d,i)=>`
     <button type="button" class="wk" data-day="${i}" aria-pressed="${i===day}">
       <span class="d">${d.name.slice(0,2)}</span>
-      <span class="bar"><span class="fill" style="height:${Math.round(d[who].k/mx*100)}%"></span></span>
-      <span class="k">${nf(d[who].k)}</span>
+      <span class="bar"><span class="fill" style="height:${Math.round(DT[i]/mx*100)}%"></span></span>
+      <span class="k">${nf(DT[i])}</span>
       ${d.gym?'<span class="g" title="день зала"></span>':'<span class="g" style="background:transparent"></span>'}
     </button>`).join('');
   return `
@@ -1333,27 +1726,87 @@ function pageHome(){
   </div>`;
 }
 
-function mealRow(m){
-  const v=m[who], cls=TAG[m.label]||'tg-ghost', nm=TAGN[m.label]||m.label;
-  return `<div class="meal">
+function optRow(title, sub, k, data){
+  return `<button type="button" class="opt" data-apply="${esc(JSON.stringify(data))}">
+    <span><h5>${esc(title)}</h5><span class="s">${esc(sub)}</span></span>
+    <span class="kk">${nf(k)}</span></button>`;
+}
+function swapPanel(di, mi){
+  const O = swapOptions(di, mi);
+  const cur = mealView(di, mi);
+  let out = '<div class="swp">';
+  if(O.dishes.length){
+    out += '<div class="swp-g"><span class="lbl">Другое блюдо<i></i></span>' + O.dishes.map(d => {
+      const st = stepsFor(d.tpl, d.items);
+      return optRow(st && !st.broken ? cap(st.title) : d.tpl.short,
+        d.tpl.gear + ' · ' + d.tpl.time, Math.round(d.v.k),
+        { di, mi, title: st && !st.broken ? cap(st.title) : d.tpl.short, tplId: d.tpl.id,
+          items: d.items.map(x => ({ n:x.n, g:x.g, r:x.r, side:!!x.side })) });
+    }).join('') + '</div>';
+  }
+  if(O.light.length){
+    out += '<div class="swp-g"><span class="lbl">Готовое без готовки<i></i></span>' + O.light.map(x =>
+      optRow(x.title, qtyText(x.items), Math.round(sumOf(x.items).k),
+        { di, mi, title: x.title, items: x.items.map(y => ({ n:y.n, g:y.g })) })).join('') + '</div>';
+  }
+  if(O.split){
+    const items = O.split[0].items.concat(O.split[1].items).map(y => ({ n:y.n, g:y.g }));
+    out += '<div class="swp-g"><span class="lbl">Разбить на два поменьше<i></i></span>' +
+      optRow(O.split[0].title + ' + ' + O.split[1].title,
+             qtyText(O.split[0].items) + ' · ' + qtyText(O.split[1].items),
+             Math.round(sumOf(items).k),
+             { di, mi, title: O.split[0].title + ' + ' + O.split[1].title, items }) + '</div>';
+  }
+  const parts = cur.items ? cur.items : parseQty(cur.qty);
+  const subLines = parts.map(x => {
+    const alts = subsFor(x.n, x.g);
+    if(!alts.length) return '';
+    return `<div class="subs"><span class="src">Нет под рукой <b>${esc(word(x.n))} ${gOf(x)}</b> — можно взять:</span>` +
+      alts.map(al => {
+        const next = parts.map(y => y.n === x.n ? { n:al.n, g:al.g, r:y.r, side:!!y.side } : { n:y.n, g:y.g, r:y.r, side:!!y.side });
+        return `<button type="button" class="sub-b" data-apply="${esc(JSON.stringify(
+          { di, mi, title: cur.title, tplId: cur.tplId || null, items: next }))}">${esc(word(al.n))} <b>${al.g} г</b></button>`;
+      }).join('') + '</div>';
+  }).filter(Boolean).join('');
+  const whole = (cur.qty || '').split(', ').length - parts.length;
+  if(subLines || whole > 0){
+    out += '<div class="swp-g"><span class="lbl">Нет продукта — чем заменить<i></i></span>' + subLines +
+      (whole > 0 ? '<p class="s" style="font-size:11.5px;color:var(--ink3)">Часть приёма — готовое блюдо из заготовок, по продуктам оно не раскладывается. Его состав и замены смотрите в разделе «Рецепты».</p>' : '') + '</div>';
+  }
+  out += `<div style="display:flex;gap:7px;flex-wrap:wrap">
+    <button type="button" class="btn btn-2" data-swapclose="1">Закрыть</button>
+    ${cur.swapped ? '<button type="button" class="btn btn-2" data-undo="' + di + '.' + mi + '">Вернуть как в плане</button>' : ''}
+    <span class="lbl" style="align-self:center">цель приёма: ${nf(O.aim.k)} ккал · белок ${O.aim.p} г</span>
+  </div></div>`;
+  return out;
+}
+function mealRow(m, di, mi){
+  const V = mealView(di, mi), v = V.v, cls = TAG[V.label] || 'tg-ghost', nm = TAGN[V.label] || V.label;
+  const key = di + '.' + mi, open = openSwap === key;
+  const st = V.swapped && V.tplId ? stepsFor(dishById(V.tplId), V.items) : null;
+  return `<div class="meal${V.swapped ? ' sw' : ''}">
     ${donut(v.p,v.f,v.c,44,7)}
     <div>
-      <div class="meal-h"><h4>${esc(m.title)}</h4><span class="tag ${cls}">${nm}</span></div>
-      <p class="qty">${esc(v.qty)}</p>
-      <p class="note">${esc(m.note)}</p>
+      <div class="meal-h"><h4>${esc(V.title)}</h4><span class="tag ${cls}">${nm}</span>${V.swapped ? '<span class="swapped-tag">замена</span>' : ''}</div>
+      <p class="qty">${esc(V.qty)}</p>
+      ${V.note ? `<p class="note">${esc(V.note)}</p>` : ''}
+      ${st && !st.broken ? `<ol class="mini-steps" style="margin-top:6px">${st.steps.map(t => `<li>${esc(t)}</li>`).join('')}</ol>` : ''}
     </div>
     <div class="meal-r">
       <span class="macro-mini">
         <span class="mm mm-p">Б ${v.p}</span><span class="mm mm-f">Ж ${v.f}</span><span class="mm mm-c">У ${v.c}</span>
       </span>
       <span class="kcal-b"><b>${nf(v.k)}</b><span>ккал</span></span>
+      <button type="button" class="swap-btn" data-swap="${key}" aria-expanded="${open}">${svg('swap')}Заменить</button>
     </div>
+    ${open ? swapPanel(di, mi) : ''}
   </div>`;
 }
 function pageWeek(){
-  const d=PLAN.days[day], v=d[who], tgt=PLAN.targets[who][d.id];
+  const d=PLAN.days[day], tgt=PLAN.targets[who][d.id];
+  const t=dayTotals(day), v={k:Math.round(t.k),p:Math.round(t.p),f:Math.round(t.f),c:Math.round(t.c)};
   const tabs = PLAN.days.map((x,i)=>
-    `<button type="button" data-day="${i}" aria-pressed="${i===day}">${x.name.slice(0,3)}${i===TODAY?" •":""}<i>${nf(x[who].k)}</i></button>`).join('');
+    `<button type="button" data-day="${i}" aria-pressed="${i===day}">${x.name.slice(0,3)}${i===TODAY?" •":""}<i>${nf(dayTotals(i).k)}</i></button>`).join('');
   return `
   <div class="card pillbar">${tabs}</div>
   <div class="card hero">
@@ -1374,7 +1827,7 @@ function pageWeek(){
   </div>
   <div class="card sec">
     <div class="sec-h"><h2>Приёмы пищи</h2><span class="lbl">навеска для: ${PLAN.people[who].name.toLowerCase()}</span></div>
-    <div class="meals">${d.meals.map(mealRow).join('')}</div>
+    <div class="meals">${d.meals.map((m,mi) => mealRow(m, day, mi)).join('')}</div>
   </div>`;
 }
 
@@ -1469,10 +1922,10 @@ function rail(){
   return `
   <div class="card sec">
     <div class="sec-h"><h2>Сегодня в плане</h2><span class="lbl">${esc(d.name)}</span></div>
-    <div class="mini">${d.meals.slice(0,4).map(m=>{
-      const v=m[who];
+    <div class="mini">${d.meals.slice(0,4).map((m,mi)=>{
+      const V=mealView(TODAY,mi), v=V.v;
       return `<div class="mini-row">${donut(v.p,v.f,v.c,34,6)}
-        <span><h5>${esc(m.title)}</h5><span class="s">${TAGN[m.label]||m.label}</span></span>
+        <span><h5>${esc(V.title)}</h5><span class="s">${(TAGN[V.label]||V.label)}${V.swapped?' · замена':''}</span></span>
         <span class="kk">${nf(v.k)}</span></div>`;
     }).join('')}</div>
   </div>
@@ -1545,6 +1998,17 @@ document.addEventListener('click', e=>{
     built = r ? r.items : [];
     builtTpl = r ? r.tpl : null;
     if(!r) consNote = 'Из отмеченных продуктов не собирается ни одно блюдо для этого приёма. Отметьте больше — хотя бы мясо или творог, овощ и гарнир.';
+    render(); return;
+  }
+  const sb2 = e.target.closest('[data-swap]');
+  if(sb2){ const k = sb2.dataset.swap; openSwap = openSwap === k ? null : k; render(); return; }
+  if(e.target.closest('[data-swapclose]')){ openSwap = null; render(); return; }
+  const un = e.target.closest('[data-undo]');
+  if(un){ const [di,mi] = un.dataset.undo.split('.').map(Number); dropSwap(di,mi); openSwap = null; render(); return; }
+  const ap = e.target.closest('[data-apply]');
+  if(ap){
+    const d = JSON.parse(ap.dataset.apply);
+    applySwap(d.di, d.mi, { title:d.title, tplId:d.tplId || null, items:d.items });
     render(); return;
   }
   const dp = e.target.closest('[data-dish]');

@@ -155,6 +155,67 @@ const probe = `
   rebuildFood();
   if (FOOD['сыр адыгейский']) { fp++; console.log('  удалённый продукт остался в базе'); }
   console.log('проблем со своими продуктами:', fp);
+  // замены в дне
+  let sw = 0;
+  for (const w of ['w','m']) {
+    who = w;
+    for (let di = 0; di < PLAN.days.length; di++) {
+      for (let mi = 0; mi < PLAN.days[di].meals.length; mi++) {
+        const m = PLAN.days[di].meals[mi];
+        const aim = m[w];
+        const O = swapOptions(di, mi);
+        if (!O.dishes.length && !O.light.length) { sw++; console.log('  нет вариантов замены:', w, PLAN.days[di].name, m.label); }
+        for (const d of O.dishes) {
+          const s = sumOf(d.items);
+          if (Math.abs(s.k - aim.k) > aim.k * 0.15) { sw++; console.log('  вариант блюда мимо цели:', w, m.label, Math.round(s.k), 'vs', aim.k, d.tpl.id); }
+          const st = stepsFor(d.tpl, d.items);
+          if (!st || st.broken) { sw++; console.log('  у варианта нет рецепта:', d.tpl.id); }
+        }
+        for (const x of O.light) {
+          const s = sumOf(x.items);
+          if (Math.abs(s.k - aim.k) > aim.k * 0.2) { sw++; console.log('  готовый вариант мимо цели:', w, m.label, Math.round(s.k), 'vs', aim.k, x.title); }
+        }
+        if (O.split) {
+          const s = sumOf(O.split[0].items.concat(O.split[1].items));
+          if (Math.abs(s.k - aim.k) > aim.k * 0.25) { sw++; console.log('  разбивка на два мимо цели:', w, m.label, Math.round(s.k), 'vs', aim.k); }
+        }
+      }
+    }
+  }
+  // применение и откат
+  who = 'w';
+  const before = mealView(0, 2).v.k, dayBefore = dayTotals(0).k;
+  const opt = swapOptions(0, 2).dishes[0];
+  if (!opt) { sw++; console.log('  нечем заменить обед понедельника'); }
+  else {
+    applySwap(0, 2, { title: 'тест', tplId: opt.tpl.id, items: opt.items });
+    const after = mealView(0, 2);
+    if (!after.swapped) { sw++; console.log('  замена не применилась'); }
+    if (after.v.k === before && Math.round(sumOf(opt.items).k) !== before) { sw++; console.log('  калории приёма не пересчитались'); }
+    if (dayTotals(0).k === dayBefore && after.v.k !== before) { sw++; console.log('  итог дня не пересчитался после замены'); }
+    if (bad(pageWeek()).length) { sw++; console.log('  ПРОБЛЕМА отрисовки дня с заменой'); }
+    openSwap = '0.2';
+    if (bad(pageWeek()).length) { sw++; console.log('  ПРОБЛЕМА отрисовки панели замены'); }
+    openSwap = null;
+    dropSwap(0, 2);
+    if (mealView(0, 2).swapped) { sw++; console.log('  откат замены не сработал'); }
+    if (dayTotals(0).k !== dayBefore) { sw++; console.log('  итог дня не вернулся после отката'); }
+  }
+  // замена продукта сохраняет калорийность приёма
+  const parts = parseQty(PLAN.days[0].meals[2].w.qty);
+  if (!parts.length) { sw++; console.log('  обед понедельника не разобрался на продукты'); }
+  for (const x of parts) {
+    for (const al of subsFor(x.n, x.g)) {
+      const f = FOOD[x.n], byP = f.cat === 'Белок' && f.p >= 8;
+      const src = byP ? f.p * x.g / 100 : f.k * x.g / 100;
+      const got = byP ? al.p : al.k;
+      if (src > 8 && Math.abs(got - src) > Math.max(src * 0.25, 12)) {
+        sw++; console.log('  замена продукта сильно мимо:', x.n, '->', al.n, Math.round(got), 'vs', Math.round(src));
+      }
+    }
+  }
+  console.log('проблем в заменах:', sw);
+  console.log('блюд в библиотеке:', DISHES.length);
   console.log('сегодня по календарю: индекс ' + TODAY + ' -> ' + PLAN.days[TODAY].name);
 })();
 `;
