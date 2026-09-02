@@ -130,6 +130,52 @@ button{font:inherit; color:inherit; border:none; background:none; cursor:pointer
   font-family:Nunito,sans-serif; font-weight:700; font-size:12px}
 .promo button:hover{background:var(--lime-d)}
 
+/* ---------- конструктор ---------- */
+.cons{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,300px); gap:16px; align-items:start}
+.cons-tools{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px}
+.btn{background:var(--lime); color:var(--on-lime); padding:9px 15px; border-radius:99px;
+  font-family:Nunito,sans-serif; font-weight:700; font-size:13px; display:inline-flex; align-items:center; gap:7px}
+.btn:hover{background:var(--lime-d)}
+.btn svg{width:14px; height:14px}
+.btn-2{background:var(--mint); color:var(--ink2); border:1px solid var(--line-c)}
+.btn-2:hover{background:var(--sunk); color:var(--ink)}
+.sel{padding:8px 11px; border-radius:9px; border:1px solid var(--line-c); background:var(--field);
+  color:var(--ink); font:inherit; font-size:13px; max-width:230px}
+
+.pantry{display:flex; flex-direction:column; gap:2px; max-height:520px; overflow-y:auto; padding-right:4px}
+.pantry .lbl{margin:11px 0 4px; position:sticky; top:0; background:var(--card); padding:3px 0; z-index:1}
+.pantry .lbl:first-child{margin-top:0}
+.pantry label{display:flex; align-items:center; gap:9px; padding:6px 9px; border-radius:8px; font-size:12.5px; color:var(--ink2); cursor:pointer}
+.pantry label:hover{background:var(--mint)}
+.pantry .kcal{margin-left:auto; font-family:"JetBrains Mono",monospace; font-size:10.5px; color:var(--ink3); white-space:nowrap}
+.pantry input{appearance:none; width:15px; height:15px; border:1.5px solid var(--line2); border-radius:5px; flex:0 0 auto; display:grid; place-items:center; cursor:pointer}
+.pantry input:checked{background:var(--lime); border-color:var(--lime)}
+.pantry input:checked::after{content:""; width:7px; height:3.5px; border-left:2px solid var(--on-lime); border-bottom:2px solid var(--on-lime); transform:rotate(-45deg) translate(1px,-1px)}
+
+.comp{display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:10px; align-items:center;
+  padding:9px 11px; background:var(--soft); border:1px solid var(--line); border-radius:var(--r3)}
+.comp h5{font-size:13px; font-weight:700}
+.comp .s{font-size:10.5px; color:var(--ink3); margin-top:2px}
+.comp .g{display:flex; align-items:center; gap:5px}
+.comp .g button{width:22px; height:22px; border-radius:6px; background:var(--card); border:1px solid var(--line2);
+  color:var(--ink2); font-family:"JetBrains Mono",monospace; font-weight:700; font-size:13px; line-height:1}
+.comp .g button:hover{background:var(--lime); color:var(--on-lime); border-color:var(--lime)}
+.comp .g b{font-family:"JetBrains Mono",monospace; font-size:12.5px; min-width:50px; text-align:center}
+.comp .del{width:22px; height:22px; border-radius:6px; color:var(--ink3); display:grid; place-items:center}
+.comp .del:hover{background:var(--di-bg); color:var(--di)}
+.comp .del svg{width:12px; height:12px}
+
+.aim{display:flex; flex-direction:column; gap:9px; padding:13px; background:var(--mint); border:1px solid var(--line-c); border-radius:var(--r2)}
+.aim-row{display:flex; align-items:baseline; justify-content:space-between; gap:8px; font-size:12px; color:var(--ink2)}
+.aim-row b{font-family:"JetBrains Mono",monospace; font-size:13px; color:var(--ink)}
+.aim-bar{height:7px; border-radius:99px; background:var(--sunk); overflow:hidden}
+.aim-bar i{display:block; height:100%; border-radius:99px; background:var(--lime); transition:width .25s}
+.aim-bar.over i{background:var(--prot)}
+.verdict{font-size:12px; padding:9px 11px; border-radius:var(--r3); line-height:1.4}
+.v-ok{background:var(--kcal-bg); color:var(--kcal)}
+.v-warn{background:var(--carb-bg); color:var(--carb-ink)}
+.v-bad{background:var(--prot-bg); color:var(--prot-ink)}
+
 .res-h{display:flex; align-items:center; gap:9px; margin:16px 0 9px}
 .res-h:first-child{margin-top:0}
 .res-h h3{font-size:14px; font-weight:800}
@@ -395,6 +441,7 @@ const ICON = {
   sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon:'<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/>',
   auto:'<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor" stroke="none"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
   x:'<path d="M6 6l12 12M18 6 6 18"/>'
 };
 const svg = (k,cls) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"${cls?` class="${cls}"`:''}>${ICON[k]}</svg>`;
@@ -484,10 +531,16 @@ const store = {
 };
 let who = store.get('kotel.who','w')==='m'?'m':'w';
 let page = 'home';
-let day = 0;
+let day = (new Date().getDay() + 6) % 7;
 let checked = store.get('kotel.shop',{}) || {};
 let query = '';
 let openRec = 0;
+const TODAY = (new Date().getDay() + 6) % 7;   /* 0 = понедельник */
+let pantry = store.get('kotel.pantry', null);
+if(!pantry) pantry = Object.fromEntries(PLAN.foods.map(f => [f.n, f.on]));
+let built = [];
+let consNote = '';
+let aimMeal = 'Обед';
 let theme = ['auto','light','dark'].includes(store.get('kotel.theme','auto')) ? store.get('kotel.theme','auto') : 'auto';
 
 /* тема: «авто» снимает штамп и отдаёт решение prefers-color-scheme */
@@ -529,6 +582,151 @@ function searchAll(raw){
   return {q, meals, recipes, snacks, sweets, shop,
           total: meals.length + recipes.length + snacks.length + sweets.length + shop.length};
 }
+/* ================= конструктор ================= */
+const FOOD = Object.fromEntries(PLAN.foods.map(f => [f.n, f]));
+/* доля приёма в дневной норме */
+const SHARE = { 'Завтрак':0.24, 'Обед':0.31, 'Ужин':0.26, 'Перекус':0.10 };
+
+function aimFor(meal){
+  const P = PLAN.people[who], sh = SHARE[meal] || 0.25;
+  return { k: Math.round(P.kcal * sh / 5) * 5,
+           p: Math.round(P.prot * (meal === 'Перекус' ? sh * 1.35 : sh)) };
+}
+function sumOf(list){
+  return list.reduce((a, x) => {
+    const f = FOOD[x.n]; if(!f) return a;
+    a.k += f.k * x.g / 100; a.p += f.p * x.g / 100; a.f += f.f * x.g / 100; a.c += f.c * x.g / 100;
+    return a;
+  }, {k:0, p:0, f:0, c:0});
+}
+function roundG(f, g){
+  if(f.unit) return Math.max(f.unit, Math.round(g / f.unit) * f.unit);
+  return Math.max(5, Math.round(g / 5) * 5);
+}
+function have(cat){ return PLAN.foods.filter(f => f.cat === cat && pantry[f.n]); }
+const pick = arr => arr.length ? arr[Math.floor(Math.random() * arr.length)] : null;
+
+/* Сборка приёма. Белок задаёт стартовую навеску, дальше калории
+   добираются гарниром, фруктом и, в последнюю очередь, самим белком.
+   Нижняя граница навески — не фиксированные 60 г, а порция продукта:
+   иначе плотные продукты вроде протеина сразу вылетают за норму. */
+function assemble(meal){
+  const aim = aimFor(meal);
+  const prots = have('Белок');
+  if(!prots.length) return null;
+  const ranked = prots.slice().sort((a,b) => b.p/Math.max(b.k,1) - a.p/Math.max(a.k,1));
+  const pr  = pick(ranked.slice(0, Math.min(6, ranked.length)));
+  /* в перекусе кладём либо фрукт, либо овощ — вдвоём они не влезают в 170 ккал */
+  const wantFruit = meal === 'Завтрак' || (meal === 'Перекус' && Math.random() < 0.6);
+  const veg = (meal !== 'Перекус' || !wantFruit) ? pick(have('Овощи')) : null;
+  const grn = meal === 'Перекус' ? null : pick(have('Гарниры'));
+  const fr  = wantFruit ? pick(have('Фрукты')) : null;
+  const oil = meal === 'Перекус' ? null : have('Жиры и добавки').find(f => f.n === 'масло раст.');
+  const milk = pr.n === 'протеин' ? have('Молочное').find(f => f.n.indexOf('молоко') === 0) : null;
+
+  const out = [];
+  const add = (f,g) => { if(f) out.push({ n:f.n, g:roundG(f,g) }); };
+
+  let gp = pr.p > 0 ? aim.p * 0.8 / (pr.p / 100) : 100;
+  gp = Math.min(gp, aim.k * 0.65 / (pr.k / 100));       // не больше 65% калорий приёма
+  gp = Math.min(Math.max(gp, pr.unit || 20), 300);
+  add(pr, gp);
+  if(milk) add(milk, 200);
+  add(veg, meal === 'Перекус' ? 100 : 150);
+  if(oil) out.push({ n:oil.n, g:5 });
+  add(fr, meal === 'Перекус' ? 100 : 120);
+  if(grn) add(grn, 100);
+
+  const order = [grn, fr, pr].filter(Boolean);
+  for(let pass = 0; pass < 5; pass++){
+    const diff = aim.k - sumOf(out).k;
+    if(Math.abs(diff) <= aim.k * 0.04) break;
+    let moved = false;
+    for(const f of order){
+      const it = out.find(x => x.n === f.n);
+      if(!it || f.k <= 0) continue;
+      const lo = f.unit || 20, hi = (f === pr) ? 300 : 260;
+      const ng = Math.min(Math.max(it.g + diff / (f.k / 100), lo), hi);
+      if(Math.abs(ng - it.g) >= (f.unit || 5)){ it.g = roundG(f, ng); moved = true; break; }
+    }
+    if(!moved) break;
+  }
+  return out;
+}
+function fromMeal(di, mi){
+  const m = PLAN.days[di].meals[mi];
+  const parts = m[who].qty.split(', ').map(t => {
+    const mm = t.match(/^(.*?)\s+(\d+(?:[.,]\d+)?)\s*(г|шт)$/);
+    if(!mm) return null;
+    const name = mm[1].trim(), num = parseFloat(mm[2].replace(',', '.'));
+    const f = FOOD[name];
+    if(!f) return null;
+    return { n: name, g: mm[3] === 'шт' ? num * (f.unit || 1) : num };
+  }).filter(Boolean);
+  return { parts, title: m.title, unknown: m[who].qty.split(', ').length - parts.length };
+}
+
+function pageCons(){
+  const aim = aimFor(aimMeal);
+  const tot = sumOf(built);
+  const pct = v => Math.min(140, Math.round(v));
+  const dk = tot.k - aim.k, dp = tot.p - aim.p;
+  let verdict = '', vcls = 'v-ok';
+  if(consNote){ vcls = 'v-warn'; verdict = consNote; }
+  else if(!built.length) verdict = 'Отметьте продукты слева и нажмите «Собрать». Можно и наоборот: взять готовый приём из меню и подправить навески.';
+  else if(Math.abs(dk) <= aim.k * 0.07 && dp >= -4) { verdict = `Попадание в цель: ${dk >= 0 ? '+' : ''}${Math.round(dk)} ккал, белок ${dp >= 0 ? '+' : ''}${Math.round(dp)} г. Так можно есть.`; }
+  else if(Math.abs(dk) <= aim.k * 0.15) { vcls = 'v-warn'; verdict = `${dk > 0 ? 'Перебор' : 'Недобор'} ${Math.abs(Math.round(dk))} ккал${dp < -4 ? `, белка не хватает ${Math.abs(Math.round(dp))} г` : ''}. Поправьте граммовку кнопками.`; }
+  else { vcls = 'v-bad'; verdict = `${dk > 0 ? 'Перебор' : 'Недобор'} ${Math.abs(Math.round(dk))} ккал — это заметно мимо нормы. Уберите или добавьте компонент.`; }
+
+  const mealOpts = ['Завтрак','Обед','Ужин','Перекус'].map(m =>
+    `<option value="${m}"${m === aimMeal ? ' selected' : ''}>${m}</option>`).join('');
+  const planOpts = PLAN.days.map((d, di) => d.meals.map((m, mi) =>
+    `<option value="${di}.${mi}">${esc(d.name)} · ${esc(m.title)}</option>`).join('')).join('');
+
+  const comps = built.length ? built.map((x, i) => {
+    const f = FOOD[x.n], v = { k: f.k*x.g/100, p: f.p*x.g/100, f: f.f*x.g/100, c: f.c*x.g/100 };
+    return `<div class="comp">
+      <span><h5>${esc(x.n)}</h5><span class="s">${Math.round(v.k)} ккал · Б ${v.p.toFixed(1)} · Ж ${v.f.toFixed(1)} · У ${v.c.toFixed(1)}</span></span>
+      <span class="g"><button type="button" data-g="${i}:-">−</button><b>${x.g}${f.unit ? ' г' : ' г'}</b><button type="button" data-g="${i}:+">+</button></span>
+      <button type="button" class="del" data-g="${i}:x" aria-label="Убрать ${esc(x.n)}">${svg('x')}</button>
+    </div>`;
+  }).join('') : `<p class="empty"><b>Пусто</b>Соберите приём из отмеченных продуктов или возьмите за основу готовый.</p>`;
+
+  const cats = [...new Set(PLAN.foods.map(f => f.cat))];
+  const onCount = PLAN.foods.filter(f => pantry[f.n]).length;
+
+  return `
+  <div class="card sec">
+    <div class="sec-h"><h2>Конструктор приёма</h2><span class="lbl">цель: ${PLAN.people[who].name.toLowerCase()} · ${aimMeal.toLowerCase()} · ${nf(aim.k)} ккал · белок ${aim.p} г</span></div>
+    <div class="cons-tools">
+      <select class="sel" id="aimSel" aria-label="Какой приём собираем">${mealOpts}</select>
+      <button type="button" class="btn" id="doBuild">${svg('auto')}Собрать</button>
+      <select class="sel" id="baseSel" aria-label="Взять за основу приём из меню"><option value="">Взять за основу из меню…</option>${planOpts}</select>
+      ${built.length ? '<button type="button" class="btn btn-2" id="doClear">Очистить</button>' : ''}
+    </div>
+    <div class="cons">
+      <div>
+        <div class="res-list">${comps}</div>
+        ${built.length ? `<div class="aim" style="margin-top:12px">
+          <div class="aim-row"><span>Калории</span><b>${Math.round(tot.k)} / ${aim.k}</b></div>
+          <div class="aim-bar${tot.k > aim.k * 1.07 ? ' over' : ''}"><i style="width:${pct(tot.k / aim.k * 100)}%"></i></div>
+          <div class="aim-row"><span>Белок</span><b>${Math.round(tot.p)} / ${aim.p} г</b></div>
+          <div class="aim-bar${tot.p > aim.p * 1.5 ? ' over' : ''}"><i style="width:${pct(tot.p / Math.max(aim.p,1) * 100)}%"></i></div>
+          <div class="aim-row"><span>Жиры / углеводы</span><b>${Math.round(tot.f)} г / ${Math.round(tot.c)} г</b></div>
+        </div>` : ''}
+        <p class="verdict ${vcls}" style="margin-top:12px">${verdict}</p>
+      </div>
+      <div>
+        <div class="sec-h" style="margin-bottom:8px"><h2 style="font-size:14px">Что есть дома</h2><span class="lbl">${onCount} из ${PLAN.foods.length}</span></div>
+        <div class="pantry">${cats.map(c =>
+          `<span class="lbl">${esc(c)}</span>` + PLAN.foods.filter(f => f.cat === c).map(f =>
+            `<label><input type="checkbox" data-food="${esc(f.n)}"${pantry[f.n] ? ' checked' : ''}><span>${esc(f.n)}</span><span class="kcal">${Math.round(f.k)}</span></label>`
+          ).join('')).join('')}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
 function pageSearch(){
   const R = searchAll(query);
   if(!R) return `<div class="card sec"><p class="empty"><b>Введите хотя бы две буквы</b>Поиск идёт по блюдам недели, навескам, рецептам, перекусам и списку покупок.</p></div>`;
@@ -570,6 +768,7 @@ function pageSearch(){
 const PAGES = [
   ['home','Обзор','home'],
   ['week','Неделя','week'],
+  ['cons','Конструктор','plus'],
   ['recipes','Рецепты','book'],
   ['snacks','Перекусы','snack'],
   ['cook','Готовка','pot'],
@@ -579,6 +778,7 @@ const PAGES = [
 const SUBS = {
   home:'Нормы, недельная раскладка и принцип, по которому одна готовка кормит двоих',
   week:'Семь дней, 42 приёма пищи. Каждая навеска посчитана из рецептов',
+  cons:'Соберите приём из того, что есть дома, или подправьте готовый под норму',
   recipes:'Двенадцать заготовок, из которых собрано всё меню',
   snacks:'Взаимозаменяемые перекусы и ежедневный слот сладкого',
   cook:'Одна большая закладка и короткие вечерние — что и когда',
@@ -589,7 +789,7 @@ const SUBS = {
 /* ---------- рендер ---------- */
 function renderNav(){
   document.getElementById('nav').innerHTML = PAGES.map(([id,t,ic])=>{
-    const c = id==='week' ? PLAN.days.length : id==='recipes' ? PLAN.recipes.length
+    const c = id==='week' ? PLAN.days.length : id==='cons' ? PLAN.foods.length : id==='recipes' ? PLAN.recipes.length
             : id==='snacks' ? PLAN.snacks.length+PLAN.sweets.length : '';
     return `<button type="button" data-page="${id}" aria-current="${id===page}">${svg(ic)}<span>${t}</span>${c?`<span class="count">${c}</span>`:''}</button>`;
   }).join('');
@@ -661,7 +861,7 @@ function mealRow(m){
 function pageWeek(){
   const d=PLAN.days[day], v=d[who], tgt=PLAN.targets[who][d.id];
   const tabs = PLAN.days.map((x,i)=>
-    `<button type="button" data-day="${i}" aria-pressed="${i===day}">${x.name.slice(0,3)}<i>${nf(x[who].k)}</i></button>`).join('');
+    `<button type="button" data-day="${i}" aria-pressed="${i===day}">${x.name.slice(0,3)}${i===TODAY?" •":""}<i>${nf(x[who].k)}</i></button>`).join('');
   return `
   <div class="card pillbar">${tabs}</div>
   <div class="card hero">
@@ -670,7 +870,7 @@ function pageWeek(){
       <span class="mid"><b>${nf(v.k)}</b><span>ккал · цель ${nf(tgt)}</span></span>
     </div>
     <div class="hero-body">
-      <h3>${esc(d.name)}</h3>
+      <h3>${esc(d.name)}${day===TODAY?' <em style="color:var(--kcal)">сегодня</em>':''}</h3>
       <p class="note">${esc(d.sub)} · ${d.meals.length} приёмов пищи · порция: ${PLAN.people[who].name.toLowerCase()}</p>
       <div class="hero-tags">
         <span class="tag ${d.gym?'tg-gym':'tg-ghost'}">${esc(d.badge)}</span>
@@ -772,7 +972,7 @@ function pageNotes(){
 }
 
 function rail(){
-  const d=PLAN.days[day];
+  const d=PLAN.days[TODAY];
   const top=[...PLAN.snacks].sort((a,b)=>density(b.p,b.k)-density(a.p,a.k)).slice(0,4);
   return `
   <div class="card sec">
@@ -798,7 +998,7 @@ function rail(){
   </div>`;
 }
 
-const RENDER = {home:pageHome, week:pageWeek, recipes:pageRecipes, snacks:pageSnacks, cook:pageCook, shop:pageShop, notes:pageNotes};
+const RENDER = {home:pageHome, week:pageWeek, cons:pageCons, recipes:pageRecipes, snacks:pageSnacks, cook:pageCook, shop:pageShop, notes:pageNotes};
 
 function render(){
   renderNav(); renderWho();
@@ -823,6 +1023,26 @@ document.addEventListener('click', e=>{
   if(nb){ page = nb.dataset.page; render(); window.scrollTo({top:0,behavior:'smooth'}); return; }
   const sb = e.target.closest('#seg button');
   if(sb){ who = sb.dataset.who; store.set('kotel.who',who); render(); return; }
+  const gr = e.target.closest('[data-g]');
+  if(gr){
+    const [i,op] = gr.dataset.g.split(':');
+    const idx = +i, item = built[idx];
+    if(item){
+      const f = FOOD[item.n], step = f.unit || (item.g > 60 ? 10 : 5);
+      if(op === 'x') built.splice(idx,1);
+      else if(op === '+') item.g += step;
+      else item.g = Math.max(f.unit || 5, item.g - step);
+    }
+    render(); return;
+  }
+  if(e.target.closest('#doBuild')){
+    consNote = '';
+    const r = assemble(aimMeal);
+    built = r || [];
+    if(!r) consNote = 'В разделе «Что есть дома» не отмечено ни одного белкового продукта — без него приём не собрать.';
+    render(); return;
+  }
+  if(e.target.id === 'doClear'){ built = []; consNote = ''; render(); return; }
   const tb = e.target.closest('[data-theme-set]');
   if(tb){ theme = tb.dataset.themeSet; store.set('kotel.theme',theme); applyTheme(); return; }
   const gb = e.target.closest('[data-go]');
@@ -839,6 +1059,20 @@ function clearQuery(){
 }
 document.addEventListener('input', e=>{
   if(e.target.id === 'q'){ query = e.target.value; render(); }
+});
+document.addEventListener('change', e=>{
+  if(e.target.id === 'aimSel'){ aimMeal = e.target.value; consNote = ''; render(); return; }
+  if(e.target.id === 'baseSel' && e.target.value){
+    const [di,mi] = e.target.value.split('.').map(Number);
+    const r = fromMeal(di,mi);
+    built = r.parts;
+    consNote = r.parts.length
+      ? (r.unknown ? `«${r.title}»: ${r.unknown} из компонентов — готовое блюдо, его КБЖУ смотрите в рецептах. Остальное можно править здесь.` : '')
+      : `«${r.title}» собран из готового блюда, а конструктор работает с сырыми продуктами. Откройте раздел «Рецепты», чтобы поменять навеску там.`;
+    render(); return;
+  }
+  const fd = e.target.closest('[data-food]');
+  if(fd){ pantry[fd.dataset.food] = fd.checked; store.set('kotel.pantry',pantry); render(); }
 });
 document.addEventListener('keydown', e=>{
   if(e.key === 'Escape' && query){ clearQuery(); render(); document.getElementById('q').blur(); }

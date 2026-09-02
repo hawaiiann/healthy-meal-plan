@@ -65,6 +65,38 @@ const probe = `
     if (!okay) { tp++; console.log('  ТЕМА', t, '-> data-theme =', JSON.stringify(stamp)); }
   }
   console.log('проблем с темой:', tp, '(auto должен снимать штамп)');
+
+  // конструктор
+  let cp = 0;
+  if (bad(pageCons()).length) { cp++; console.log('  ПРОБЛЕМА пустой конструктор'); }
+  for (const w of ['w','m']) {
+    who = w;
+    for (const meal of ['Завтрак','Обед','Ужин','Перекус']) {
+      aimMeal = meal;
+      const aim = aimFor(meal);
+      let miss = 0;
+      for (let t = 0; t < 25; t++) {              // сборка случайная — гоняем много раз
+        const r = assemble(meal);
+        if (!r) { cp++; console.log('  сборка вернула пусто', w, meal); break; }
+        built = r;
+        if (bad(pageCons()).length) { cp++; console.log('  ПРОБЛЕМА отрисовки', w, meal); break; }
+        const s = sumOf(r);
+        if (Math.abs(s.k - aim.k) > aim.k * 0.18) miss++;
+      }
+      if (miss > 3) { cp++; console.log('  мимо цели ' + miss + '/25:', w, meal, 'цель', aim.k); }
+    }
+  }
+  built = [];
+  // разбор готового приёма на продукты
+  let parsed = 0, whole = 0;
+  for (let di = 0; di < PLAN.days.length; di++)
+    for (let mi = 0; mi < PLAN.days[di].meals.length; mi++) {
+      const r = fromMeal(di, mi);
+      if (r.parts.length) { parsed++; if (bad(JSON.stringify(r)).length) cp++; } else whole++;
+    }
+  console.log('разбор приёмов: ' + parsed + ' раскладываются на продукты, ' + whole + ' из готовых блюд');
+  console.log('проблем в конструкторе:', cp);
+  console.log('сегодня по календарю: индекс ' + TODAY + ' -> ' + PLAN.days[TODAY].name);
 })();
 `;
 eval(body + probe);
