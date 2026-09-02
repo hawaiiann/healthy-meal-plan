@@ -216,6 +216,53 @@ const probe = `
   }
   console.log('проблем в заменах:', sw);
   console.log('блюд в библиотеке:', DISHES.length);
+  // личные нормы и пересчёт от веса
+  let pp = 0;
+  // формула Миффлина вручную: мужчина 31 год, 175 см, 90 кг
+  const ref = calcNorm({ sex:'m', age:31, h:175, wt:90, act:1.375, def:23, gk:1.8 });
+  const bmrExp = 10*90 + 6.25*175 - 5*31 + 5;
+  if (Math.abs(ref.bmr - bmrExp) > 1) { pp++; console.log('  BMR посчитан неверно:', ref.bmr, 'ожидалось', bmrExp); }
+  if (Math.abs(ref.tdee - bmrExp*1.375) > 2) { pp++; console.log('  поддержка неверна:', ref.tdee); }
+  if (Math.abs(ref.kcal - bmrExp*1.375*0.77) > 5) { pp++; console.log('  норма с дефицитом неверна:', ref.kcal); }
+  if (ref.prot !== 162) { pp++; console.log('  белок при 1,8 г/кг неверен:', ref.prot); }
+  // неполные данные не должны давать норму
+  for (const bad2 of [null, {}, {wt:80}, {wt:80,h:175}, {wt:0,h:175,age:31}]) {
+    if (calcNorm(bad2)) { pp++; console.log('  неполные параметры дали норму:', JSON.stringify(bad2)); }
+  }
+  // без профиля работает базовая норма
+  profiles = {};
+  who = 'm';
+  if (person('m').kcal !== PLAN.people.m.kcal) { pp++; console.log('  без профиля норма должна быть базовой'); }
+  if (Math.abs(scaleOf('m') - 1) > 0.001) { pp++; console.log('  масштаб без профиля должен быть 1'); }
+
+  // профиль меняет норму и тянет за собой меню
+  const dayBase = dayTotals(0).k, tgtBase = targetFor('m', PLAN.days[0].id);
+  profiles.m = { sex:'m', age:31, h:175, wt:80, act:1.375, def:23, gk:1.8, fk:0.9 };
+  const P2 = person('m');
+  if (!P2.custom) { pp++; console.log('  профиль не подхватился'); }
+  if (P2.kcal >= PLAN.people.m.kcal) { pp++; console.log('  вес меньше — норма должна упасть:', P2.kcal); }
+  if (P2.prot !== 144) { pp++; console.log('  белок должен пересчитаться на новый вес:', P2.prot); }
+  const f = scaleOf('m');
+  const dayNew = dayTotals(0).k, tgtNew = targetFor('m', PLAN.days[0].id);
+  if (Math.abs(dayNew / dayBase - f) > 0.03) { pp++; console.log('  день не отмасштабировался:', Math.round(dayNew), 'vs', Math.round(dayBase*f)); }
+  if (Math.abs(tgtNew / tgtBase - f) > 0.03) { pp++; console.log('  цель дня не отмасштабировалась'); }
+  // навески в тексте тоже пересчитаны
+  const v0 = PLAN.days[0].meals[0].m.qty, v1 = mealView(0, 0).qty;
+  if (v0 === v1) { pp++; console.log('  граммовка приёма не изменилась'); }
+  if (v1.indexOf(' г') < 0 && v1.indexOf(' шт') < 0) { pp++; console.log('  граммовка после пересчёта потеряла единицы:', v1); }
+  if (bad(pageProfile()).length) { pp++; console.log('  ПРОБЛЕМА отрисовки страницы параметров'); }
+  if (bad(pageWeek()).length) { pp++; console.log('  ПРОБЛЕМА отрисовки недели с личной нормой'); }
+  // подстановки в тексте тренда не должны утекать в вёрстку
+  profiles.m.hist = [{ d:'2026-08-01', wt:84 }, { d:'2026-08-15', wt:82 }, { d:'2026-08-29', wt:80 }];
+  const ph = pageProfile();
+  if (ph.indexOf(String.fromCharCode(36) + '{') >= 0) { pp++; console.log('  в странице параметров осталась неподставленная вставка'); }
+  if (ph.indexOf('кг в неделю') < 0) { pp++; console.log('  журнал веса не показал темп'); }
+  // сброс возвращает базовую норму
+  delete profiles.m;
+  if (person('m').kcal !== PLAN.people.m.kcal) { pp++; console.log('  сброс профиля не вернул базовую норму'); }
+  if (Math.abs(dayTotals(0).k - dayBase) > 1) { pp++; console.log('  день не вернулся к базовым цифрам'); }
+  profiles = {};
+  console.log('проблем в личных нормах:', pp);
   console.log('сегодня по календарю: индекс ' + TODAY + ' -> ' + PLAN.days[TODAY].name);
 })();
 `;

@@ -167,6 +167,27 @@ button{font:inherit; color:inherit; border:none; background:none; cursor:pointer
 .pline .rm svg{width:11px; height:11px}
 .mine{display:inline-block; width:5px; height:5px; border-radius:50%; background:var(--lime-d); flex:0 0 auto}
 
+/* ---------- параметры ---------- */
+.prm{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:11px}
+.prm .wide{grid-column:1 / -1}
+.prm label{display:block; font-family:Nunito,sans-serif; font-size:9.5px; font-weight:700;
+  letter-spacing:.09em; text-transform:uppercase; color:var(--ink3); margin-bottom:5px}
+.prm input,.prm select{width:100%; padding:9px 10px; border-radius:9px; border:1px solid var(--line-c);
+  background:var(--card); color:var(--ink); font:inherit; font-size:14px}
+.norm-out{display:grid; grid-template-columns:repeat(auto-fit,minmax(96px,1fr)); gap:8px; margin-top:4px}
+.norm-out div{padding:10px 11px; background:var(--mint); border:1px solid var(--line-c); border-radius:var(--r3)}
+.norm-out .lbl{display:block; margin-bottom:3px}
+.norm-out b{font-family:"JetBrains Mono",monospace; font-size:15px; font-weight:700; font-variant-numeric:tabular-nums}
+.norm-out s{text-decoration:none; font-size:11px; color:var(--ink3)}
+.hist{display:flex; flex-direction:column; gap:0}
+.hist-row{display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:baseline;
+  padding:8px 0; border-bottom:1px solid var(--line); font-size:13px}
+.hist-row:last-child{border-bottom:none}
+.hist-row .d{font-family:"JetBrains Mono",monospace; font-size:11.5px; color:var(--ink3)}
+.hist-row b{font-family:"JetBrains Mono",monospace; font-weight:700}
+.hist-row .dt{font-family:"JetBrains Mono",monospace; font-size:12px}
+.dn{color:var(--kcal)} .up{color:var(--prot-ink)}
+
 /* ---------- замены в дне ---------- */
 .meal.sw{border-color:var(--lime); background:var(--lime-soft)}
 .swap-btn{display:inline-flex; align-items:center; gap:5px; padding:4px 9px; border-radius:99px;
@@ -580,6 +601,7 @@ const ICON = {
   sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon:'<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/>',
   auto:'<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor" stroke="none"/>',
+  gear:'<circle cx="12" cy="12" r="3.2"/><path d="M19.4 14.5a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5v.2a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3h.1a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8v.1a1.6 1.6 0 0 0 1.5 1h.2a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>',
   swap:'<path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/>',
   pan:'<path d="M3 11h13a5 5 0 0 1 0 10H8a5 5 0 0 1-5-5z"/><path d="M16 13h3.5a2 2 0 0 0 0-4H18"/><path d="M7 7.5c0-1.5 1.5-1.5 1.5-3M11 7.5c0-1.5 1.5-1.5 1.5-3"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
@@ -739,11 +761,58 @@ let FOOD = {};
 const rebuildFood = () => { FOOD = Object.fromEntries(allFoods().map(f => [f.n, f])); };
 rebuildFood();
 let showForm = false, formMsg = '';
+/* ================= личные нормы =================
+   Вес меняется — меняется и поддержка, и норма белка. Держать одну
+   цифру месяцами нельзя: похудел на 5 кг — поддержка упала примерно
+   на 60 ккал, и прежний дефицит стал меньше, чем кажется.
+   Параметры живут только в браузере: страница публичная. */
+let profiles = store.get('kotel.profiles', {}) || {};
+if(typeof profiles !== 'object') profiles = {};
+
+const ACT = [
+  [1.2,   'Почти не двигаюсь, зала нет'],
+  [1.375, 'Сидячая работа, 3 тренировки в неделю'],
+  [1.465, 'Сидячая работа, 4–5 тренировок'],
+  [1.55,  'Активный день или 6 тренировок']
+];
+function calcNorm(p){
+  if(!p || !(p.wt > 25) || !(p.h > 100) || !(p.age > 10)) return null;
+  const bmr  = 10 * p.wt + 6.25 * p.h - 5 * p.age + (p.sex === 'm' ? 5 : -161);
+  const tdee = bmr * (p.act || 1.375);
+  const kcal = Math.round(tdee * (1 - (p.def || 12) / 100) / 5) * 5;
+  const prot = Math.round(p.wt * (p.gk || 1.8));
+  const fat  = Math.round(p.wt * (p.fk || 0.9));
+  const carb = Math.max(0, Math.round((kcal - prot * 4 - fat * 9) / 4));
+  return { bmr:Math.round(bmr), tdee:Math.round(tdee), kcal, prot, fat, carb };
+}
+/* норма человека: своя, если параметры заданы, иначе базовая из плана */
+function person(k){
+  const base = PLAN.people[k], p = profiles[k], n = calcNorm(p);
+  if(!n) return base;
+  return Object.assign({}, base, {
+    custom:true, tdee:n.tdee, bmr:n.bmr, kcal:n.kcal, prot:n.prot, fat:n.fat, carb:n.carb,
+    deficit: p.def || 12,
+    gkg: Math.round(n.prot / p.wt * 100) / 100,
+    meta: 'мои параметры',
+    note: 'пересчитано на вес ' + String(p.wt).replace('.', ',') + ' кг'
+  });
+}
+/* во сколько раз личная норма отличается от базовой — на столько же
+   масштабируются дневные цели и навески в меню */
+const scaleOf = k => person(k).kcal / PLAN.people[k].kcal;
+function scaleQty(text, f){
+  return String(text).replace(/(\d+(?:[.,]\d+)?)\s*(г|шт|мл)/g, (m0, num, unit) => {
+    const v = parseFloat(num.replace(',', '.')) * f;
+    return (unit === 'шт' ? Math.max(1, Math.round(v)) : Math.max(5, Math.round(v / 5) * 5)) + ' ' + unit;
+  });
+}
+const targetFor = (k, dayId) => Math.round(PLAN.targets[k][dayId] * scaleOf(k) / 5) * 5;
+
 /* доля приёма в дневной норме */
 const SHARE = { 'Завтрак':0.24, 'Обед':0.31, 'Ужин':0.26, 'Перекус':0.10 };
 
 function aimFor(meal){
-  const P = PLAN.people[who], sh = SHARE[meal] || 0.25;
+  const P = person(who), sh = SHARE[meal] || 0.25;
   return { k: Math.round(P.kcal * sh / 5) * 5,
            p: Math.round(P.prot * (meal === 'Перекус' ? sh * 1.35 : sh)) };
 }
@@ -1359,8 +1428,14 @@ function scaleParts(parts, targetK){
 function mealView(di, mi){
   const m = PLAN.days[di].meals[mi];
   const sw = swaps[swapKey(di, mi)];
-  if(!sw || !sw.items || !sw.items.length)
-    return { title:m.title, note:m.note, label:m.label, qty:m[who].qty, v:m[who], swapped:false };
+  if(!sw || !sw.items || !sw.items.length){
+    const f = scaleOf(who), v = m[who];
+    if(Math.abs(f - 1) < 0.005)
+      return { title:m.title, note:m.note, label:m.label, qty:v.qty, v, swapped:false };
+    return { title:m.title, note:m.note, label:m.label, swapped:false, scaled:true,
+             qty: scaleQty(v.qty, f),
+             v: { k:Math.round(v.k*f), p:Math.round(v.p*f), f:Math.round(v.f*f), c:Math.round(v.c*f) } };
+  }
   const s = sumOf(sw.items);
   return {
     title: sw.title, note: sw.note || '', label: m.label, qty: qtyText(sw.items),
@@ -1540,7 +1615,7 @@ function pageCons(){
 
   return `
   <div class="card sec">
-    <div class="sec-h"><h2>Конструктор приёма</h2><span class="lbl">цель: ${PLAN.people[who].name.toLowerCase()} · ${aimMeal.toLowerCase()} · ${nf(aim.k)} ккал · белок ${aim.p} г</span></div>
+    <div class="sec-h"><h2>Конструктор приёма</h2><span class="lbl">цель: ${person(who).name.toLowerCase()} · ${aimMeal.toLowerCase()} · ${nf(aim.k)} ккал · белок ${aim.p} г</span></div>
     <div class="cons-tools">
       <select class="sel" id="aimSel" aria-label="Какой приём собираем">${mealOpts}</select>
       <button type="button" class="btn" id="doBuild">${svg('auto')}Собрать</button>
@@ -1582,6 +1657,32 @@ function pageCons(){
 /* Свой продукт: валидируем то, что реально ломает расчёт, а спорное
    показываем предупреждением и всё равно сохраняем — на упаковках
    сумма макросов часто не сходится с калорийностью. */
+function saveProfile(){
+  const val = id => (document.getElementById(id) || {}).value || '';
+  const num = id => { const v = parseFloat(String(val(id)).replace(',', '.')); return isNaN(v) ? 0 : v; };
+  const p = Object.assign({}, profiles[who] || {});
+  p.sex = val('pf_sex') || (who === 'm' ? 'm' : 'w');
+  p.age = Math.round(num('pf_age'));
+  p.h   = Math.round(num('pf_h'));
+  p.wt  = Math.round(num('pf_wt') * 10) / 10;
+  p.act = num('pf_act') || 1.375;
+  const def = num('pf_def'), gk = num('pf_gk');
+  p.def = def > 0 ? def : 12;
+  p.gk  = gk > 0 ? gk : 1.8;
+  p.fk  = p.fk || 0.9;
+  if(!calcNorm(p)){ profiles[who] = p; store.set('kotel.profiles', profiles); render(); return; }
+  /* журнал: пишем, только если вес поменялся или записи ещё нет */
+  const hist = (p.hist || []).slice();
+  const today = new Date().toISOString().slice(0, 10);
+  const last = hist[hist.length - 1];
+  if(!last || Math.abs(last.wt - p.wt) >= 0.1){ hist.push({ d: today, wt: p.wt }); }
+  else if(last) { last.d = today; }
+  p.hist = hist.slice(-10);
+  profiles[who] = p;
+  store.set('kotel.profiles', profiles);
+  render();
+}
+
 function saveFood(){
   const val = id => (document.getElementById(id) || {}).value || '';
   const num = id => { const v = parseFloat(String(val(id)).replace(',', '.')); return isNaN(v) ? 0 : v; };
@@ -1608,12 +1709,87 @@ function saveFood(){
   render();
 }
 
+function pageProfile(){
+  const P = person(who), p = profiles[who] || {};
+  const base = PLAN.people[who];
+  const n = calcNorm(p);
+  const hist = (p.hist || []).slice().reverse();
+  const fmt = d => { const x = new Date(d); return String(x.getDate()).padStart(2,'0') + '.' + String(x.getMonth()+1).padStart(2,'0') + '.' + x.getFullYear(); };
+
+  let trend = '';
+  if(hist.length >= 2){
+    const a = hist[0], b = hist[hist.length - 1];
+    const days = Math.max(1, Math.round((new Date(a.d) - new Date(b.d)) / 86400000));
+    const per = (a.wt - b.wt) / days * 7;
+    const dw = a.wt - b.wt;
+    const num = v => Math.abs(v).toFixed(v === Math.round(v) ? 0 : 1).replace('.', ',');
+    /* «слишком быстро» зависит от массы: 0,7 кг в неделю для 86 кг — норма,
+       для 60 кг — уже перебор. Порог берём около 0,9% массы тела. */
+    const fast = Math.abs(per) > (p.wt || 70) * 0.009;
+    trend = 'За ' + days + ' дн. вес ' + (dw > 0 ? '+' : dw < 0 ? '−' : '') + num(dw) +
+      ' кг — это ' + num(per) + ' кг в неделю. ' +
+      (Math.abs(per) < 0.05 ? 'Вес стоит. Если так вторую-третью неделю подряд — снимайте 100–150 ккал с углеводов гарнира, но не с белка.'
+        : per > 0.15 ? 'Дефицита фактически нет: проверьте, всё ли попадает в счёт.'
+        : (per < 0 && fast) ? 'Быстрее, чем стоило бы: на таком темпе уходит не только жир. Добавьте 100–150 ккал обратно.'
+        : per < 0 ? 'Темп в рабочем коридоре, так и держите.'
+        : 'Небольшой набор — в пределах колебаний воды, смотрите ещё неделю.');
+  }
+
+  const rows = [
+    ['Пол', `<select id="pf_sex"><option value="w"${p.sex !== 'm' ? ' selected' : ''}>Женский</option><option value="m"${p.sex === 'm' ? ' selected' : ''}>Мужской</option></select>`],
+    ['Возраст, лет', `<input id="pf_age" type="number" min="14" max="90" step="1" value="${p.age || ''}" placeholder="31">`],
+    ['Рост, см', `<input id="pf_h" type="number" min="120" max="230" step="1" value="${p.h || ''}" placeholder="175">`],
+    ['Текущий вес, кг', `<input id="pf_wt" type="number" min="30" max="250" step="0.1" value="${p.wt || ''}" placeholder="80">`]
+  ].map(([l, f]) => `<div><label>${l}</label>${f}</div>`).join('');
+
+  const actOpts = ACT.map(([v, t]) => `<option value="${v}"${(p.act || 1.375) == v ? ' selected' : ''}>${t}</option>`).join('');
+
+  return `
+  <div class="card sec">
+    <div class="sec-h"><h2>Мои параметры</h2><span class="lbl">только в этом браузере</span></div>
+    <p class="lead" style="margin-bottom:14px">Вес меняется — меняется и поддержка, и норма белка. Похудели на 5 кг: поддержка упала примерно на 60 ккал, и прежний дефицит стал меньше, чем кажется. Заполните поля — норма пересчитается, а вместе с ней и навески во всём меню. Пусто — работают базовые цифры плана.</p>
+    <div class="prm">
+      ${rows}
+      <div class="wide"><label>Образ жизни</label><select id="pf_act">${actOpts}</select></div>
+      <div><label>Дефицит, %</label><input id="pf_def" type="number" min="0" max="30" step="1" value="${p.def === undefined ? '' : p.def}" placeholder="12"></div>
+      <div><label>Белок, г на кг</label><input id="pf_gk" type="number" min="1" max="2.5" step="0.05" value="${p.gk === undefined ? '' : p.gk}" placeholder="1,8"></div>
+      <div class="wide" style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn" id="pf_save">Пересчитать норму</button>
+        ${p.wt ? '<button type="button" class="btn btn-2" id="pf_reset">Сбросить к базовой</button>' : ''}
+      </div>
+    </div>
+    ${n ? `<div class="norm-out" style="margin-top:14px">
+      <div><span class="lbl">Обмен покоя</span><b>${nf(n.bmr)}</b> <s>ккал</s></div>
+      <div><span class="lbl">Поддержка</span><b>${nf(n.tdee)}</b> <s>ккал</s></div>
+      <div><span class="lbl">Норма</span><b>${nf(n.kcal)}</b> <s>ккал</s></div>
+      <div><span class="lbl">Белок</span><b>${n.prot}</b> <s>г</s></div>
+      <div><span class="lbl">Жиры</span><b>${n.fat}</b> <s>г</s></div>
+      <div><span class="lbl">Углеводы</span><b>${n.carb}</b> <s>г</s></div>
+    </div>
+    <p class="verdict ${Math.abs(scaleOf(who) - 1) > 0.12 ? 'v-warn' : 'v-ok'}" style="margin-top:12px">
+      Базовая норма плана — ${nf(base.kcal)} ккал. Ваша — ${nf(n.kcal)}, это ${scaleOf(who) >= 1 ? '+' : '−'}${Math.abs(Math.round((scaleOf(who) - 1) * 100))}%. На столько же пересчитаны все навески в меню.</p>`
+    : '<p class="verdict v-warn" style="margin-top:12px">Заполните возраст, рост и вес — без них формула не считает. Пока действует базовая норма плана: ' + nf(base.kcal) + ' ккал.</p>'}
+  </div>
+  ${hist.length ? `<div class="card sec">
+    <div class="sec-h"><h2>Журнал веса</h2><span class="lbl">${hist.length} ${hist.length === 1 ? 'запись' : hist.length < 5 ? 'записи' : 'записей'}</span></div>
+    ${trend ? `<p class="verdict v-ok" style="margin-bottom:12px">${esc(trend)}</p>` : ''}
+    <div class="hist">${hist.map((x, i) => {
+      const prev = hist[i + 1];
+      const d = prev ? x.wt - prev.wt : 0;
+      return `<div class="hist-row"><span class="d">${fmt(x.d)}</span>
+        <span class="dt">${String(x.wt).replace('.', ',')} кг</span>
+        <b class="${d < 0 ? 'dn' : d > 0 ? 'up' : ''}">${prev ? (d > 0 ? '+' : d < 0 ? '−' : '') + (d ? Math.abs(d).toFixed(1).replace('.', ',') : '0') + ' кг' : 'старт'}</b></div>`;
+    }).join('')}</div>
+    <p class="lead" style="font-size:12.5px;margin-top:12px">Взвешивайтесь раз в неделю утром натощак и записывайте сюда. Норма пересчитывается сразу, а формула — только гипотеза с разбросом ±15%: последнее слово всегда за динамикой на весах.</p>
+  </div>` : ''}`;
+}
+
 function pageSearch(){
   const R = searchAll(query);
   if(!R) return `<div class="card sec"><p class="empty"><b>Введите хотя бы две буквы</b>Поиск идёт по блюдам недели, навескам, рецептам, перекусам и списку покупок.</p></div>`;
   if(!R.total) return `<div class="card sec"><p class="empty"><b>Ничего не нашлось</b>По запросу «${esc(query)}» совпадений нет. Попробуйте часть слова — например «гриб» вместо «шампиньоны».</p></div>`;
   const head = (t,n) => `<div class="res-h"><h3>${t}</h3><span class="c">${n}</span></div>`;
-  let out = `<div class="card sec"><div class="sec-h"><h2>Найдено: ${R.total}</h2><span class="lbl">запрос «${esc(query)}» · порции: ${PLAN.people[who].name.toLowerCase()}</span></div>`;
+  let out = `<div class="card sec"><div class="sec-h"><h2>Найдено: ${R.total}</h2><span class="lbl">запрос «${esc(query)}» · порции: ${person(who).name.toLowerCase()}</span></div>`;
   if(R.meals.length){
     out += head('В меню недели', R.meals.length) + '<div class="res-list">' + R.meals.map(({d,di,m}) => {
       const v = m[who];
@@ -1654,6 +1830,7 @@ const PAGES = [
   ['snacks','Перекусы','snack'],
   ['cook','Готовка','pot'],
   ['shop','Покупки','cart'],
+  ['profile','Параметры','gear'],
   ['notes','Правки','note']
 ];
 const SUBS = {
@@ -1664,6 +1841,7 @@ const SUBS = {
   snacks:'Взаимозаменяемые перекусы и ежедневный слот сладкого',
   cook:'Одна большая закладка и короткие вечерние — что и когда',
   shop:'Разделено по логике доступа: скоропорт рядом с домом, длинное хранение по случаю',
+  profile:'Нормы пересчитываются от текущего веса — параметры хранятся только в этом браузере',
   notes:'Допущения, замены и то, на что смотреть через три недели'
 };
 
@@ -1680,15 +1858,15 @@ function renderWho(){
   if(segM && !segM.children.length)
     segM.innerHTML = [['w','Она'],['m','Он']].map(([k,t]) => `<button type="button" data-who="${k}">${t}</button>`).join('');
   document.querySelectorAll('[data-who]').forEach(b=>b.setAttribute('aria-pressed', b.dataset.who===who));
-  const P = PLAN.people[who];
+  const P = person(who);
   document.getElementById('whoMeta').innerHTML =
     `<b>${nf(P.kcal)} ккал</b> в среднем за день<br>${esc(P.meta)}<br>белок ${P.prot} г · ${String(P.gkg).replace(".",",")} г/кг`;
   document.getElementById('footAvg').textContent =
-    `${PLAN.people.w.name}: ${nf(PLAN.people.w.kcal)} ккал · ${PLAN.people.m.name}: ${nf(PLAN.people.m.kcal)} ккал`;
+    `${person('w').name}: ${nf(person('w').kcal)} ккал · ${person('m').name}: ${nf(person('m').kcal)} ккал`;
 }
 
 function pageHome(){
-  const W=PLAN.people.w, M=PLAN.people.m;
+  const W=person('w'), M=person('m');
   const norm = P => `<div class="norm${P.key===who?' on':''}">
       <div class="norm-h"><h3>${P.name}</h3><span class="meta">${esc(P.meta)} · ${esc(P.note)}</span></div>
       <p class="big">${nf(P.kcal)} <span>ккал/день</span></p>
@@ -1716,7 +1894,7 @@ function pageHome(){
     <p class="lead" style="margin-top:12px">Коэффициент активности снижен до 1,375: три зала и пара прогулок в неделю не компенсируют сидячий день. Дальше пути расходятся. Там, где есть заметный запас жировой массы, дефицит углублён до 23% — это безопасно и даёт около полукилограмма в неделю. Там, где вес уже в норме, оставлены 12%: глубже начинается зона, в которой на тренировочном дне доступной энергии остаётся меньше 30 ккал на килограмм сухой массы, а это бьёт по гормональному фону и по той самой мышечной массе, ради которой ходят в зал.</p>
   </div>
   <div class="card sec">
-    <div class="sec-h"><h2>Неделя в калориях</h2><span class="lbl">точка — день зала · ${PLAN.people[who].name.toLowerCase()}</span></div>
+    <div class="sec-h"><h2>Неделя в калориях</h2><span class="lbl">точка — день зала · ${person(who).name.toLowerCase()}</span></div>
     <div class="week">${bars}</div>
   </div>
   <div class="card sec">
@@ -1803,7 +1981,7 @@ function mealRow(m, di, mi){
   </div>`;
 }
 function pageWeek(){
-  const d=PLAN.days[day], tgt=PLAN.targets[who][d.id];
+  const d=PLAN.days[day], tgt=targetFor(who, d.id);
   const t=dayTotals(day), v={k:Math.round(t.k),p:Math.round(t.p),f:Math.round(t.f),c:Math.round(t.c)};
   const tabs = PLAN.days.map((x,i)=>
     `<button type="button" data-day="${i}" aria-pressed="${i===day}">${x.name.slice(0,3)}${i===TODAY?" •":""}<i>${nf(dayTotals(i).k)}</i></button>`).join('');
@@ -1816,7 +1994,7 @@ function pageWeek(){
     </div>
     <div class="hero-body">
       <h3>${esc(d.name)}${day===TODAY?' <em style="color:var(--kcal)">сегодня</em>':''}</h3>
-      <p class="note">${esc(d.sub)} · ${d.meals.length} приёмов пищи · порция: ${PLAN.people[who].name.toLowerCase()}</p>
+      <p class="note">${esc(d.sub)} · ${d.meals.length} приёмов пищи · порция: ${person(who).name.toLowerCase()}</p>
       <div class="hero-tags">
         <span class="tag ${d.gym?'tg-gym':'tg-ghost'}">${esc(d.badge)}</span>
         <span class="tag tg-ghost">${meter(v.p,v.k)}</span>
@@ -1826,7 +2004,7 @@ function pageWeek(){
     ${tiles(v)}
   </div>
   <div class="card sec">
-    <div class="sec-h"><h2>Приёмы пищи</h2><span class="lbl">навеска для: ${PLAN.people[who].name.toLowerCase()}</span></div>
+    <div class="sec-h"><h2>Приёмы пищи</h2><span class="lbl">навеска для: ${person(who).name.toLowerCase()}</span></div>
     <div class="meals">${d.meals.map((m,mi) => mealRow(m, day, mi)).join('')}</div>
   </div>`;
 }
@@ -1943,14 +2121,14 @@ function rail(){
   </div>`;
 }
 
-const RENDER = {home:pageHome, week:pageWeek, cons:pageCons, recipes:pageRecipes, snacks:pageSnacks, cook:pageCook, shop:pageShop, notes:pageNotes};
+const RENDER = {home:pageHome, week:pageWeek, cons:pageCons, profile:pageProfile, recipes:pageRecipes, snacks:pageSnacks, cook:pageCook, shop:pageShop, notes:pageNotes};
 
 function render(){
   renderNav(); renderWho();
   const title = PAGES.find(p=>p[0]===page)[1];
   document.getElementById('pgTitle').textContent = title;
   document.getElementById('pgSub').textContent = SUBS[page];
-  const P=PLAN.people[who];
+  const P=person(who);
   document.getElementById('pgBadge').textContent = `${P.name} · ${nf(P.kcal)} ккал/день`;
   const inSearch = query.trim().length > 0;
   if(inSearch){
@@ -1980,6 +2158,8 @@ document.addEventListener('click', e=>{
     }
     render(); return;
   }
+  if(e.target.closest('#pf_save')){ saveProfile(); return; }
+  if(e.target.closest('#pf_reset')){ delete profiles[who]; store.set('kotel.profiles', profiles); render(); return; }
   if(e.target.closest('#addFood')){ showForm = true; formMsg = ''; render(); return; }
   if(e.target.closest('#cancelFood')){ showForm = false; formMsg = ''; render(); return; }
   if(e.target.closest('#saveFood')){ saveFood(); return; }
