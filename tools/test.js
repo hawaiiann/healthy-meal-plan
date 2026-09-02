@@ -38,6 +38,33 @@ const probe = `
   }
   console.log('дней мимо цели больше 3%:', tg);
   console.log('донат: сегментов', (donut(30,10,40,44,7).match(/stroke-dasharray/g) || []).length);
+
+  // поиск
+  let sp = 0;
+  for (const c of ['гриб','лазан','минтай','творог','протеин','зефир','xyzzy','г']) {
+    query = c;
+    const out = pageSearch();
+    const b = bad(out);
+    if (b.length) { sp++; console.log('  ПРОБЛЕМА поиск', c, b.join(',')); }
+    const R = searchAll(c);
+    if (c === 'xyzzy' && R && R.total !== 0) { sp++; console.log('  поиск: мусорный запрос дал результаты'); }
+    if (c === 'г' && R !== null) { sp++; console.log('  поиск: одна буква не должна искать'); }
+    if (c === 'гриб' && (!R || R.total === 0)) { sp++; console.log('  поиск: «гриб» ничего не нашёл'); }
+  }
+  query = 'гриб';
+  if (!pageSearch().includes('class="mark"')) { sp++; console.log('  поиск: нет подсветки совпадения'); }
+  query = '';
+  console.log('проблем в поиске:', sp);
+
+  // тема
+  let tp = 0;
+  for (const t of ['light','dark','auto']) {
+    theme = t; applyTheme();
+    const stamp = document.documentElement.getAttribute('data-theme');
+    const okay = t === 'auto' ? stamp === null : stamp === t;
+    if (!okay) { tp++; console.log('  ТЕМА', t, '-> data-theme =', JSON.stringify(stamp)); }
+  }
+  console.log('проблем с темой:', tp, '(auto должен снимать штамп)');
 })();
 `;
 eval(body + probe);

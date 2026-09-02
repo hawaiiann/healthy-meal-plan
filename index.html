@@ -17,7 +17,7 @@
   --di:#8A461B;  --di-bg:#FBC79A;
   --sn:#2F6B62;  --sn-bg:#D9EDE9;
   --sw:#8A4A6B;  --sw-bg:#F7DCE6;
-  --dot:#F4A340;
+  --dot:#F4A340; --promo:#F7CE5C; --promo-ink:#3A2B06; --field:#F2F5EC;
   --r:16px; --r2:12px; --r3:9px;
   --shadow:0 1px 2px rgba(31,42,22,.05), 0 8px 24px -16px rgba(31,42,22,.2);
 }
@@ -25,7 +25,7 @@
   :root:not([data-theme="light"]){
     --bg:#12150D; --card:#1B2014; --soft:#241D18; --mint:#202617; --sunk:#171B11;
     --line:#382E27; --line-c:#2E3724; --line2:#4A3C33;
-    --ink:#EBF0DF; --ink2:#B0BAA2; --ink3:#869079;
+    --ink:#EBF0DF; --ink2:#B0BAA2; --ink3:#8D977F;
     --lime:#A9DB63; --lime-d:#C2E88A; --on-lime:#18240C; --lime-soft:#26351A;
     --kcal:#A8D46B; --kcal-bg:#26351A;
     --prot:#E2853A; --prot-on:#1E1206; --prot-bg:#3A2617; --prot-ink:#EC9F5D;
@@ -36,14 +36,14 @@
     --di:#EC9F5D;  --di-bg:#3A2617;
     --sn:#79B5AC;  --sn-bg:#16302C;
     --sw:#D29FB8;  --sw-bg:#31212A;
-    --dot:#E9973B;
+    --dot:#E9973B; --promo:#D9AE45; --promo-ink:#241A03; --field:#232A1A;
     --shadow:0 1px 2px rgba(0,0,0,.35), 0 8px 24px -16px rgba(0,0,0,.65);
   }
 }
 :root[data-theme="dark"]{
   --bg:#12150D; --card:#1B2014; --soft:#241D18; --mint:#202617; --sunk:#171B11;
   --line:#382E27; --line-c:#2E3724; --line2:#4A3C33;
-  --ink:#EBF0DF; --ink2:#B0BAA2; --ink3:#869079;
+  --ink:#EBF0DF; --ink2:#B0BAA2; --ink3:#8D977F;
   --lime:#A9DB63; --lime-d:#C2E88A; --on-lime:#18240C; --lime-soft:#26351A;
   --kcal:#A8D46B; --kcal-bg:#26351A;
   --prot:#E2853A; --prot-on:#1E1206; --prot-bg:#3A2617; --prot-ink:#EC9F5D;
@@ -54,7 +54,7 @@
   --di:#EC9F5D;  --di-bg:#3A2617;
   --sn:#79B5AC;  --sn-bg:#16302C;
   --sw:#D29FB8;  --sw-bg:#31212A;
-  --dot:#E9973B;
+  --dot:#E9973B; --promo:#D9AE45; --promo-ink:#241A03; --field:#232A1A;
   --shadow:0 1px 2px rgba(0,0,0,.35), 0 8px 24px -16px rgba(0,0,0,.65);
 }
 
@@ -105,6 +105,45 @@ button{font:inherit; color:inherit; border:none; background:none; cursor:pointer
 .pillbar button:hover{background:var(--mint)}
 .pillbar button[aria-pressed="true"]{background:var(--lime); color:var(--on-lime); border-color:var(--lime)}
 .pillbar button i{font-style:normal; font-family:"JetBrains Mono",monospace; font-size:10.5px; opacity:.6; margin-left:5px}
+
+.search{position:relative; flex:1 1 200px; max-width:330px; min-width:150px}
+.search input{width:100%; padding:9px 30px 9px 33px; border-radius:99px; border:1px solid var(--line-c);
+  background:var(--field); color:var(--ink); font:inherit; font-size:13.5px; -webkit-appearance:none}
+.search input::placeholder{color:var(--ink3)}
+.search input::-webkit-search-cancel-button{display:none}
+.search .mg{position:absolute; left:12px; top:50%; transform:translateY(-50%); width:15px; height:15px; color:var(--ink3); pointer-events:none}
+.search .clr{position:absolute; right:6px; top:50%; transform:translateY(-50%); width:22px; height:22px; border-radius:50%; display:grid; place-items:center; color:var(--ink3)}
+.search .clr:hover{background:var(--sunk); color:var(--ink)}
+.search .clr svg{width:12px; height:12px}
+
+.theme-seg{display:flex; gap:2px; background:var(--sunk); padding:3px; border-radius:9px; flex:0 0 auto}
+.theme-seg button{width:30px; height:26px; border-radius:7px; display:grid; place-items:center; color:var(--ink3)}
+.theme-seg button svg{width:14px; height:14px}
+.theme-seg button:hover{color:var(--ink)}
+.theme-seg button[aria-pressed="true"]{background:var(--card); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.1)}
+
+.promo{margin-top:14px; padding:14px; border-radius:var(--r2); background:var(--promo); color:var(--promo-ink)}
+.promo .lbl{color:var(--promo-ink); opacity:.65; display:block; margin-bottom:7px}
+.promo p{font-size:12.5px; line-height:1.4; margin-bottom:11px}
+.promo p b{font-weight:700}
+.promo button{background:var(--lime); color:var(--on-lime); padding:7px 13px; border-radius:99px;
+  font-family:Nunito,sans-serif; font-weight:700; font-size:12px}
+.promo button:hover{background:var(--lime-d)}
+
+.res-h{display:flex; align-items:center; gap:9px; margin:16px 0 9px}
+.res-h:first-child{margin-top:0}
+.res-h h3{font-size:14px; font-weight:800}
+.res-h .c{font-family:"JetBrains Mono",monospace; font-size:11px; color:var(--ink3)}
+.res-row{display:grid; grid-template-columns:34px minmax(0,1fr) auto; gap:11px; align-items:center;
+  padding:10px 12px; background:var(--soft); border:1px solid var(--line); border-radius:var(--r3); width:100%; text-align:left}
+.res-row:hover{border-color:var(--line2)}
+.res-row h5{font-size:13px; font-weight:700}
+.res-row .s{font-size:11px; color:var(--ink3); margin-top:2px; line-height:1.35}
+.res-row .kk{font-family:"JetBrains Mono",monospace; font-size:12px; font-weight:700; color:var(--ink2); white-space:nowrap}
+.res-list{display:flex; flex-direction:column; gap:7px}
+.mark{background:var(--carb-bg); color:var(--carb-ink); border-radius:3px; padding:0 2px}
+.empty{padding:28px 16px; text-align:center; color:var(--ink3); font-size:13.5px}
+.empty b{display:block; font-family:Nunito,sans-serif; font-size:15px; color:var(--ink2); margin-bottom:5px}
 
 .sec{padding:18px}
 .sec-h{display:flex; align-items:baseline; gap:10px; margin-bottom:14px; flex-wrap:wrap}
@@ -305,12 +344,23 @@ summary::-webkit-details-marker{display:none}
       </div>
       <p class="who-meta" id="whoMeta"></p>
     </div>
+    <div class="promo">
+      <span class="lbl">Ближайшая закладка</span>
+      <p><b>Воскресенье, 55 минут активных.</b> Суп-гуляш, бёдра с овощами, творожная запеканка, гречка и хлеб — этого хватает до среды.</p>
+      <button type="button" data-go="cook">Весь график</button>
+    </div>
   </aside>
 
   <main class="main">
     <div class="card topbar">
       <h1 id="pgTitle">Обзор</h1>
+      <div class="search">
+        <svg class="mg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 4 4"/></svg>
+        <input id="q" type="search" autocomplete="off" spellcheck="false" placeholder="Поиск: блюдо, продукт, рецепт" aria-label="Поиск по плану">
+        <button type="button" class="clr" id="qClear" hidden aria-label="Очистить поиск"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      </div>
       <span class="tag tg-ghost num" id="pgBadge"></span>
+      <div class="theme-seg" id="themeSeg" role="group" aria-label="Оформление"></div>
       <p class="sub" id="pgSub"></p>
     </div>
     <div id="pages"></div>
@@ -340,6 +390,11 @@ const ICON = {
   drop:'<path d="M12 3.5s5.5 6 5.5 9.6a5.5 5.5 0 1 1-11 0C6.5 9.5 12 3.5 12 3.5z"/>',
   leaf:'<path d="M20 4C10 4 4.5 8 4.5 14.5A5.5 5.5 0 0 0 10 20c6.5 0 10-5.5 10-16z"/><path d="M4.5 20C8 15 12 12.5 16 11"/>',
   chev:'<path d="m6 9 6 6 6-6"/>'
+,
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  moon:'<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/>',
+  auto:'<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor" stroke="none"/>',
+  x:'<path d="M6 6l12 12M18 6 6 18"/>'
 };
 const svg = (k,cls) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"${cls?` class="${cls}"`:''}>${ICON[k]}</svg>`;
 
@@ -430,6 +485,86 @@ let who = store.get('kotel.who','w')==='m'?'m':'w';
 let page = 'home';
 let day = 0;
 let checked = store.get('kotel.shop',{}) || {};
+let query = '';
+let openRec = 0;
+let theme = ['auto','light','dark'].includes(store.get('kotel.theme','auto')) ? store.get('kotel.theme','auto') : 'auto';
+
+/* тема: «авто» снимает штамп и отдаёт решение prefers-color-scheme */
+function applyTheme(){
+  const el = document.documentElement;
+  if(theme === 'auto') el.removeAttribute('data-theme');
+  else el.setAttribute('data-theme', theme);
+  const seg = document.getElementById('themeSeg');
+  if(seg) seg.innerHTML = [['auto','auto','Как в системе'],['light','sun','Светлая'],['dark','moon','Тёмная']]
+    .map(([k,ic,t]) => `<button type="button" data-theme-set="${k}" aria-pressed="${k===theme}" title="${t}" aria-label="${t}">${svg(ic)}</button>`).join('');
+}
+
+/* ---------- поиск ---------- */
+function hl(text, q){
+  const t = String(text);
+  if(!q) return esc(t);
+  const i = t.toLowerCase().indexOf(q);
+  if(i < 0) return esc(t);
+  return esc(t.slice(0,i)) + '<span class="mark">' + esc(t.slice(i, i+q.length)) + '</span>' + esc(t.slice(i+q.length));
+}
+function searchAll(raw){
+  const q = raw.trim().toLowerCase();
+  if(q.length < 2) return null;
+  const hit = t => String(t).toLowerCase().includes(q);
+  const meals = [];
+  PLAN.days.forEach((d,di) => d.meals.forEach(m => {
+    if(hit(m.title) || hit(m.note) || hit(m[who].qty)) meals.push({d,di,m});
+  }));
+  const recipes = [];
+  PLAN.recipes.forEach((r,ri) => {
+    if(hit(r.title) || hit(r.gear) || r.ing.some(i => hit(i.n)) || r.steps.some(hit) || hit(r.hint)) recipes.push({r,ri});
+  });
+  const snacks = PLAN.snacks.filter(x => hit(x.title) || hit(x.qty) || hit(x.note));
+  const sweets = PLAN.sweets.filter(x => hit(x.title) || hit(x.qty) || hit(x.note));
+  const shop = [];
+  SHOP.forEach(([t,,groups]) => groups.forEach(([g,items]) => items.forEach(([n,amt]) => {
+    if(hit(n)) shop.push({t,g,n,amt});
+  })));
+  return {q, meals, recipes, snacks, sweets, shop,
+          total: meals.length + recipes.length + snacks.length + sweets.length + shop.length};
+}
+function pageSearch(){
+  const R = searchAll(query);
+  if(!R) return `<div class="card sec"><p class="empty"><b>Введите хотя бы две буквы</b>Поиск идёт по блюдам недели, навескам, рецептам, перекусам и списку покупок.</p></div>`;
+  if(!R.total) return `<div class="card sec"><p class="empty"><b>Ничего не нашлось</b>По запросу «${esc(query)}» совпадений нет. Попробуйте часть слова — например «гриб» вместо «шампиньоны».</p></div>`;
+  const head = (t,n) => `<div class="res-h"><h3>${t}</h3><span class="c">${n}</span></div>`;
+  let out = `<div class="card sec"><div class="sec-h"><h2>Найдено: ${R.total}</h2><span class="lbl">запрос «${esc(query)}» · порции: ${PLAN.people[who].name.toLowerCase()}</span></div>`;
+  if(R.meals.length){
+    out += head('В меню недели', R.meals.length) + '<div class="res-list">' + R.meals.map(({d,di,m}) => {
+      const v = m[who];
+      return `<button type="button" class="res-row" data-day="${di}">${donut(v.p,v.f,v.c,34,6)}
+        <span><h5>${hl(m.title,R.q)}</h5><span class="s">${esc(d.name)} · ${TAGN[m.label]||m.label} · ${hl(v.qty,R.q)}</span></span>
+        <span class="kk">${nf(v.k)}</span></button>`;
+    }).join('') + '</div>';
+  }
+  if(R.recipes.length){
+    out += head('Рецепты', R.recipes.length) + '<div class="res-list">' + R.recipes.map(({r,ri}) => {
+      const ing = r.ing.filter(i => i.n.toLowerCase().includes(R.q)).map(i => i.n);
+      return `<button type="button" class="res-row" data-recipe="${ri}">${donut(r.per100.p,r.per100.f,r.per100.c,34,6)}
+        <span><h5>${hl(r.title,R.q)}</h5><span class="s">${esc(r.gear)}${ing.length?' · в навеске: '+ing.map(x=>hl(x,R.q)).join(', '):''}</span></span>
+        <span class="kk">${r.per100.k}/100 г</span></button>`;
+    }).join('') + '</div>';
+  }
+  for(const [t,list,dest] of [['Перекусы',R.snacks,'snacks'],['Сладкое',R.sweets,'snacks']]){
+    if(!list.length) continue;
+    out += head(t, list.length) + '<div class="res-list">' + list.map(x =>
+      `<button type="button" class="res-row" data-go="${dest}">${donut(x.p,x.f,x.c,34,6)}
+        <span><h5>${hl(x.title,R.q)}</h5><span class="s">${hl(x.qty,R.q)}</span></span>
+        <span class="kk">${x.k}</span></button>`).join('') + '</div>';
+  }
+  if(R.shop.length){
+    out += head('В списке покупок', R.shop.length) + '<div class="res-list">' + R.shop.map(x =>
+      `<button type="button" class="res-row" data-go="shop"><span class="lbl" style="text-align:center">${esc(x.g.slice(0,2))}</span>
+        <span><h5>${hl(x.n,R.q)}</h5><span class="s">${esc(x.t)} · ${esc(x.g)}</span></span>
+        <span class="kk">${esc(x.amt)}</span></button>`).join('') + '</div>';
+  }
+  return out + '</div>';
+}
 
 const PAGES = [
   ['home','Обзор','home'],
@@ -556,7 +691,7 @@ function pageRecipes(){
     <p class="lead" style="margin-bottom:14px">Основное мясо — курица; говядина и индейка появляются по одному разу за неделю, рыба только белая. КБЖУ посчитано из навески и выхода — именно эти цифры стоят в порциях меню.</p>
     <div class="grid" style="gap:9px">${PLAN.recipes.map((r,i)=>{
       const p = r.pw>0;
-      return `<details class="rec"${i===0?' open':''}>
+      return `<details class="rec"${i===openRec?' open':''}>
         <summary class="rec-h">
           ${donut(r.per100.p,r.per100.f,r.per100.c,44,7)}
           <span><h4>${esc(r.title)}</h4><span class="g">${esc(r.gear)}</span></span>
@@ -671,7 +806,14 @@ function render(){
   document.getElementById('pgSub').textContent = SUBS[page];
   const P=PLAN.people[who];
   document.getElementById('pgBadge').textContent = `${P.name} · ${nf(P.kcal)} ккал/день`;
-  document.getElementById('pages').innerHTML = `<div class="main" style="gap:14px">${RENDER[page]()}</div>`;
+  const inSearch = query.trim().length > 0;
+  if(inSearch){
+    document.getElementById('pgTitle').textContent = 'Поиск';
+    document.getElementById('pgSub').textContent = 'Совпадения по всему плану: меню, рецепты, перекусы, покупки';
+  }
+  document.getElementById('pages').innerHTML = `<div class="main" style="gap:14px">${inSearch ? pageSearch() : RENDER[page]()}</div>`;
+  const clr = document.getElementById('qClear');
+  if(clr) clr.hidden = !inSearch;
   document.getElementById('rail').innerHTML = rail();
 }
 
@@ -680,12 +822,31 @@ document.addEventListener('click', e=>{
   if(nb){ page = nb.dataset.page; render(); window.scrollTo({top:0,behavior:'smooth'}); return; }
   const sb = e.target.closest('#seg button');
   if(sb){ who = sb.dataset.who; store.set('kotel.who',who); render(); return; }
+  const tb = e.target.closest('[data-theme-set]');
+  if(tb){ theme = tb.dataset.themeSet; store.set('kotel.theme',theme); applyTheme(); return; }
+  const gb = e.target.closest('[data-go]');
+  if(gb){ page = gb.dataset.go; clearQuery(); render(); window.scrollTo({top:0,behavior:'smooth'}); return; }
+  const rb = e.target.closest('[data-recipe]');
+  if(rb){ openRec = +rb.dataset.recipe; page = 'recipes'; clearQuery(); render(); window.scrollTo({top:0,behavior:'smooth'}); return; }
   const db = e.target.closest('[data-day]');
-  if(db){ day = +db.dataset.day; if(page!=='week'){ page='week'; } render(); return; }
+  if(db){ day = +db.dataset.day; page = 'week'; clearQuery(); render(); window.scrollTo({top:0,behavior:'smooth'}); return; }
+});
+function clearQuery(){
+  query = '';
+  const i = document.getElementById('q');
+  if(i) i.value = '';
+}
+document.addEventListener('input', e=>{
+  if(e.target.id === 'q'){ query = e.target.value; render(); }
+});
+document.addEventListener('keydown', e=>{
+  if(e.key === 'Escape' && query){ clearQuery(); render(); document.getElementById('q').blur(); }
+  if(e.key === '/' && document.activeElement.id !== 'q'){ e.preventDefault(); document.getElementById('q').focus(); }
 });
 document.addEventListener('change', e=>{
   const cb = e.target.closest('.shopg input');
   if(cb){ checked[cb.dataset.k] = cb.checked; store.set('kotel.shop',checked); }
 });
+applyTheme();
 render();
 </script>
