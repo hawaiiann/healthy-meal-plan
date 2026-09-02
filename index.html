@@ -1,0 +1,691 @@
+<title>Один котёл, два половника</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+:root{
+  --bg:#EEF4E1; --card:#FFFFFF; --soft:#FDF1EC; --mint:#F4F9EA; --sunk:#EFF1EA;
+  --line:#F2E4DC; --line-c:#E7EDDA; --line2:#E2CFC4;
+  --ink:#1F2A16; --ink2:#5C6650; --ink3:#6A725F;
+  --lime:#A9DB63; --lime-d:#86BB3C; --on-lime:#22300F; --lime-soft:#DCF0AF;
+  --kcal:#4A721D; --kcal-bg:#E3F0C8;
+  --prot:#F0913F; --prot-on:#3D2007; --prot-bg:#FBE0C8; --prot-ink:#995114;
+  --fat:#8C8F7E;  --fat-bg:#EDEEE9;  --fat-ink:#63695B;
+  --carb:#C9A227; --carb-bg:#FCEBBB; --carb-ink:#8A6410;
+  --br:#7E5A0E; --br-bg:#FCE3A0;
+  --lu:#4A6B1A;  --lu-bg:#DCF0AF;
+  --di:#8A461B;  --di-bg:#FBC79A;
+  --sn:#2F6B62;  --sn-bg:#D9EDE9;
+  --sw:#8A4A6B;  --sw-bg:#F7DCE6;
+  --dot:#F4A340;
+  --r:16px; --r2:12px; --r3:9px;
+  --shadow:0 1px 2px rgba(31,42,22,.05), 0 8px 24px -16px rgba(31,42,22,.2);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#12150D; --card:#1B2014; --soft:#241D18; --mint:#202617; --sunk:#171B11;
+    --line:#382E27; --line-c:#2E3724; --line2:#4A3C33;
+    --ink:#EBF0DF; --ink2:#B0BAA2; --ink3:#869079;
+    --lime:#A9DB63; --lime-d:#C2E88A; --on-lime:#18240C; --lime-soft:#26351A;
+    --kcal:#A8D46B; --kcal-bg:#26351A;
+    --prot:#E2853A; --prot-on:#1E1206; --prot-bg:#3A2617; --prot-ink:#EC9F5D;
+    --fat:#9BA38D;  --fat-bg:#2A2E25;  --fat-ink:#A6AE98;
+    --carb:#D9B54A; --carb-bg:#352C16; --carb-ink:#DEBE64;
+    --br:#DEBE64; --br-bg:#352C16;
+    --lu:#A8D46B;  --lu-bg:#26351A;
+    --di:#EC9F5D;  --di-bg:#3A2617;
+    --sn:#79B5AC;  --sn-bg:#16302C;
+    --sw:#D29FB8;  --sw-bg:#31212A;
+    --dot:#E9973B;
+    --shadow:0 1px 2px rgba(0,0,0,.35), 0 8px 24px -16px rgba(0,0,0,.65);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12150D; --card:#1B2014; --soft:#241D18; --mint:#202617; --sunk:#171B11;
+  --line:#382E27; --line-c:#2E3724; --line2:#4A3C33;
+  --ink:#EBF0DF; --ink2:#B0BAA2; --ink3:#869079;
+  --lime:#A9DB63; --lime-d:#C2E88A; --on-lime:#18240C; --lime-soft:#26351A;
+  --kcal:#A8D46B; --kcal-bg:#26351A;
+  --prot:#E2853A; --prot-on:#1E1206; --prot-bg:#3A2617; --prot-ink:#EC9F5D;
+  --fat:#9BA38D;  --fat-bg:#2A2E25;  --fat-ink:#A6AE98;
+  --carb:#D9B54A; --carb-bg:#352C16; --carb-ink:#DEBE64;
+  --br:#DEBE64; --br-bg:#352C16;
+  --lu:#A8D46B;  --lu-bg:#26351A;
+  --di:#EC9F5D;  --di-bg:#3A2617;
+  --sn:#79B5AC;  --sn-bg:#16302C;
+  --sw:#D29FB8;  --sw-bg:#31212A;
+  --dot:#E9973B;
+  --shadow:0 1px 2px rgba(0,0,0,.35), 0 8px 24px -16px rgba(0,0,0,.65);
+}
+
+*{box-sizing:border-box}
+body{background:var(--bg); color:var(--ink); font-family:"Golos Text",system-ui,sans-serif; font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased}
+h1,h2,h3,h4,h5{font-family:Nunito,system-ui,sans-serif; margin:0; letter-spacing:-.015em; text-wrap:balance}
+p{margin:0}
+button{font:inherit; color:inherit; border:none; background:none; cursor:pointer}
+:focus-visible{outline:2px solid var(--lime-d); outline-offset:2px; border-radius:6px}
+.num{font-family:"JetBrains Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums}
+.lbl{font-family:Nunito,sans-serif; font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--ink3)}
+
+/* ---------- shell ---------- */
+.shell{display:grid; grid-template-columns:230px minmax(0,1fr) 306px; gap:14px; padding:14px; max-width:1420px; margin:0 auto; align-items:start}
+.card{background:var(--card); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow)}
+
+/* ---------- sidebar ---------- */
+.side{position:sticky; top:14px; padding:18px 14px; display:flex; flex-direction:column; gap:6px}
+.brand{display:flex; align-items:center; gap:10px; padding:2px 6px 16px}
+.brand-mark{width:32px; height:32px; border-radius:10px; background:var(--lime); display:grid; place-items:center; flex:0 0 auto}
+.brand-mark svg{width:19px; height:19px; display:block}
+.brand b{font-family:Nunito,sans-serif; font-size:16.5px; font-weight:800; line-height:1.15; display:block}
+.brand span{font-size:11px; color:var(--ink3); display:block; margin-top:1px}
+.nav{display:flex; flex-direction:column; gap:2px}
+.nav button{display:flex; align-items:center; gap:10px; padding:9px 11px; border-radius:10px; font-family:Nunito,sans-serif; font-size:14px; font-weight:600; color:var(--ink2); text-align:left; width:100%}
+.nav button svg{width:17px; height:17px; flex:0 0 auto; opacity:.75}
+.nav button:hover{background:var(--mint); color:var(--ink)}
+.nav button[aria-current="true"]{background:var(--lime); color:var(--on-lime)}
+.nav button[aria-current="true"] svg{opacity:1}
+.nav .count{margin-left:auto; font-family:"JetBrains Mono",monospace; font-size:10.5px; color:var(--ink3)}
+.nav button[aria-current="true"] .count{color:var(--on-lime); opacity:.65}
+
+.who-switch{margin-top:16px; padding:12px; background:var(--mint); border:1px solid var(--line); border-radius:var(--r2)}
+.who-switch .lbl{display:block; margin-bottom:8px}
+.seg{display:grid; grid-template-columns:1fr 1fr; gap:4px; background:var(--sunk); padding:3px; border-radius:10px}
+.seg button{padding:7px 4px; border-radius:8px; font-family:Nunito,sans-serif; font-weight:700; font-size:13px; color:var(--ink2)}
+.seg button[aria-pressed="true"]{background:var(--card); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.who-meta{margin-top:9px; font-size:11.5px; color:var(--ink3); line-height:1.35}
+.who-meta b{color:var(--ink2); font-weight:600}
+
+/* ---------- main ---------- */
+.main{display:flex; flex-direction:column; gap:14px; min-width:0}
+.topbar{display:flex; align-items:center; gap:12px; padding:14px 18px; flex-wrap:wrap}
+.topbar h1{font-size:21px; font-weight:800; flex:1 1 auto; min-width:140px}
+.topbar .sub{font-size:12.5px; color:var(--ink3); width:100%; margin-top:-4px}
+.pillbar{display:flex; gap:6px; overflow-x:auto; padding:12px; scrollbar-width:thin}
+.pillbar button{flex:0 0 auto; padding:7px 13px; border-radius:99px; font-family:Nunito,sans-serif; font-weight:700; font-size:13px; color:var(--ink2); border:1px solid var(--line)}
+.pillbar button:hover{background:var(--mint)}
+.pillbar button[aria-pressed="true"]{background:var(--lime); color:var(--on-lime); border-color:var(--lime)}
+.pillbar button i{font-style:normal; font-family:"JetBrains Mono",monospace; font-size:10.5px; opacity:.6; margin-left:5px}
+
+.sec{padding:18px}
+.sec-h{display:flex; align-items:baseline; gap:10px; margin-bottom:14px; flex-wrap:wrap}
+.sec-h h2{font-size:17px; font-weight:800}
+.sec-h .lbl{margin-left:auto}
+.lead{color:var(--ink2); font-size:14px; max-width:66ch}
+
+/* ---------- hero (день) ---------- */
+.hero{display:grid; grid-template-columns:auto minmax(0,1fr) 180px; gap:20px; padding:20px; align-items:center}
+.hero-ring{position:relative; width:148px; height:148px}
+.hero-ring .mid{position:absolute; inset:0; display:grid; place-items:center; text-align:center; line-height:1.05}
+.hero-ring .mid b{font-family:Nunito,sans-serif; font-size:31px; font-weight:800; display:block; letter-spacing:-.03em}
+.hero-ring .mid span{font-size:10.5px; color:var(--ink3); display:block; margin-top:3px}
+.hero-body h3{font-size:22px; font-weight:800; margin-bottom:6px}
+.hero-body .note{color:var(--ink2); font-size:13.5px; margin-bottom:12px}
+.hero-tags{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px}
+.tiles{display:flex; flex-direction:column; gap:7px}
+.tile{display:flex; align-items:center; gap:9px; padding:9px 11px; border-radius:var(--r3)}
+.tile .t-i{width:22px; height:22px; border-radius:7px; display:grid; place-items:center; flex:0 0 auto; background:rgba(255,255,255,.55)}
+.tile .t-i svg{width:13px; height:13px}
+.tile .t-t{font-size:10.5px; font-weight:600; opacity:.85; line-height:1.1}
+.tile .t-v{font-family:"JetBrains Mono",monospace; font-weight:700; font-size:14px; line-height:1.15}
+.t-kcal{background:var(--kcal-bg); color:var(--kcal)}
+.t-prot{background:var(--prot); color:var(--prot-on)}
+.t-prot .t-t{opacity:.7}
+.t-fat{background:var(--fat-bg); color:var(--fat-ink)}
+.t-carb{background:var(--carb-bg); color:var(--carb-ink)}
+:root[data-theme="dark"] .tile .t-i, :root:not([data-theme="light"]) .tile .t-i{background:rgba(255,255,255,.08)}
+
+/* ---------- бейджи ---------- */
+.tag{display:inline-flex; align-items:center; gap:5px; padding:4px 9px; border-radius:99px; font-family:Nunito,sans-serif; font-size:11px; font-weight:700; white-space:nowrap}
+.tg-br{background:var(--br-bg); color:var(--br)}
+.tg-lu{background:var(--lu-bg); color:var(--lu)}
+.tg-di{background:var(--di-bg); color:var(--di)}
+.tg-sn{background:var(--sn-bg); color:var(--sn)}
+.tg-sw{background:var(--sw-bg); color:var(--sw)}
+.tg-gym{background:var(--lime-soft); color:var(--kcal)}
+.tg-ghost{background:var(--mint); color:var(--ink3); border:1px solid var(--line-c)}
+
+/* ---------- строки приёмов ---------- */
+.meals{display:flex; flex-direction:column; gap:9px}
+.meal{display:grid; grid-template-columns:52px minmax(0,1fr) auto; gap:14px; align-items:center; padding:12px 14px; background:var(--soft); border:1px solid var(--line); border-radius:var(--r2)}
+.meal:hover{border-color:var(--line2)}
+.meal-h{display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-bottom:3px}
+.meal-h h4{font-size:15px; font-weight:700}
+.meal .qty{font-size:12px; color:var(--ink3); line-height:1.4}
+.meal .note{font-size:11.5px; color:var(--ink3); margin-top:5px; line-height:1.4}
+.meal-r{display:flex; align-items:center; gap:14px}
+.kcal-b{text-align:right}
+.kcal-b b{font-family:Nunito,sans-serif; font-size:19px; font-weight:800; display:block; line-height:1; letter-spacing:-.02em}
+.kcal-b span{font-size:10px; color:var(--ink3)}
+.macro-mini{display:flex; gap:5px}
+.mm{display:flex; align-items:center; gap:4px; padding:4px 8px; border-radius:7px; font-family:"JetBrains Mono",monospace; font-size:11px; font-weight:700}
+.mm-p{background:var(--prot-bg); color:var(--prot-ink)}
+.mm-f{background:var(--fat-bg); color:var(--fat-ink)}
+.mm-c{background:var(--carb-bg); color:var(--carb-ink)}
+
+/* ---------- недельный график ---------- */
+.week{display:grid; grid-template-columns:repeat(7,1fr); gap:8px}
+.wk{display:flex; flex-direction:column; align-items:center; gap:7px; padding:12px 4px 10px; border-radius:var(--r2); background:var(--mint); border:1px solid var(--line-c); cursor:pointer; text-align:center}
+.wk:hover{border-color:var(--line2)}
+.wk[aria-pressed="true"]{background:var(--lime-soft); border-color:var(--lime)}
+.wk .d{font-family:Nunito,sans-serif; font-weight:800; font-size:12px}
+.wk .bar{width:100%; max-width:34px; height:76px; background:var(--sunk); border-radius:7px; position:relative; overflow:hidden}
+.wk .fill{position:absolute; left:0; right:0; bottom:0; background:linear-gradient(180deg,var(--lime),var(--lime-d)); border-radius:7px}
+.wk .k{font-family:"JetBrains Mono",monospace; font-size:10.5px; color:var(--ink2); font-weight:700}
+.wk .g{width:5px; height:5px; border-radius:50%; background:var(--kcal)}
+
+/* ---------- нормы ---------- */
+.norms{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+.norm{padding:16px; border-radius:var(--r2); border:1px solid var(--line-c); background:var(--mint)}
+.norm.on{background:var(--lime-soft); border-color:var(--lime)}
+.norm-h{display:flex; align-items:center; gap:10px; margin-bottom:12px}
+.norm-h h3{font-size:16px; font-weight:800}
+.norm-h .meta{font-size:11px; color:var(--ink3)}
+.big{font-family:Nunito,sans-serif; font-size:30px; font-weight:800; letter-spacing:-.03em; line-height:1}
+.big span{font-family:"Golos Text",sans-serif; font-size:12px; font-weight:500; color:var(--ink3); letter-spacing:0}
+.stack{display:grid; grid-template-columns:auto 1fr; font-size:12.5px; margin-top:12px}
+.stack dt{padding:6px 0; border-top:1px solid var(--line); color:var(--ink2)}
+.stack dd{padding:6px 0; border-top:1px solid var(--line); margin:0; text-align:right; font-family:"JetBrains Mono",monospace; font-weight:500}
+.stack dd b{font-weight:700}
+
+/* ---------- правая колонка ---------- */
+.rail{position:sticky; top:14px; display:flex; flex-direction:column; gap:14px}
+.rail .sec{padding:16px}
+.mini{display:flex; flex-direction:column; gap:8px}
+.mini-row{display:grid; grid-template-columns:34px minmax(0,1fr) auto; gap:10px; align-items:center; padding:9px 10px; background:var(--soft); border:1px solid var(--line); border-radius:var(--r3)}
+.mini-row h5{font-size:12.5px; font-weight:700; line-height:1.25}
+.mini-row .s{font-size:10.5px; color:var(--ink3); margin-top:2px}
+.mini-row .kk{font-family:"JetBrains Mono",monospace; font-size:12px; font-weight:700; color:var(--ink2); white-space:nowrap}
+.cook-l{display:flex; flex-direction:column; gap:0}
+.cook-i{display:grid; grid-template-columns:38px 1fr; gap:10px; padding:10px 0; border-bottom:1px solid var(--line)}
+.cook-i:last-child{border-bottom:none}
+.cook-i .dd{font-family:Nunito,sans-serif; font-weight:800; font-size:12px; color:var(--kcal)}
+.cook-i .dd small{display:block; font-family:"JetBrains Mono",monospace; font-weight:500; font-size:9.5px; color:var(--ink3); margin-top:2px}
+.cook-i p{font-size:12px; color:var(--ink2); line-height:1.4}
+.cook-i p b{color:var(--ink); font-weight:600}
+.cook-i.key{background:var(--carb-bg); border-radius:var(--r3); padding:10px; border-bottom:none; margin-bottom:4px}
+.cook-i.key .dd{color:var(--carb-ink)}
+.cook-i.key p{color:var(--ink2)}
+
+/* ---------- сетки карточек ---------- */
+.grid{display:grid; gap:10px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.item{padding:13px; background:var(--soft); border:1px solid var(--line); border-radius:var(--r2); display:flex; flex-direction:column; gap:7px}
+.item h4{font-size:14px; font-weight:700; line-height:1.3}
+.item .q{font-size:11.5px; color:var(--ink3); line-height:1.4; flex:1 1 auto}
+.item .n{font-size:11.5px; color:var(--ink2); font-style:italic}
+
+/* ---------- рецепты ---------- */
+.rec{background:var(--soft); border:1px solid var(--line); border-radius:var(--r2); overflow:hidden}
+summary{list-style:none; cursor:pointer}
+summary::-webkit-details-marker{display:none}
+.rec-h{display:grid; grid-template-columns:44px minmax(0,1fr) auto auto; gap:12px; align-items:center; padding:12px 14px; width:100%; text-align:left}
+.rec-h:hover{background:var(--mint)}
+.rec-h h4{font-size:15px; font-weight:700}
+.rec-h .g{font-size:11px; color:var(--ink3); margin-top:2px}
+.rec-h .chev{width:16px; height:16px; color:var(--ink3); transition:transform .18s}
+.rec[open] .chev{transform:rotate(180deg)}
+.rec-b{padding:0 14px 14px; display:grid; grid-template-columns:minmax(0,260px) minmax(0,1fr); gap:20px}
+.rec-b h5{margin:0 0 7px; font-family:Nunito,sans-serif; font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--ink3)}
+.ing{display:flex; flex-direction:column; gap:0}
+.ing li{display:flex; justify-content:space-between; gap:10px; padding:5px 0; border-bottom:1px dotted var(--line2); font-size:12.5px; color:var(--ink2); list-style:none}
+.ing li span{font-family:"JetBrains Mono",monospace; font-size:11.5px; color:var(--ink3); white-space:nowrap}
+.ing{margin:0; padding:0}
+.steps{margin:0; padding-left:17px; font-size:12.5px; color:var(--ink2); display:flex; flex-direction:column; gap:5px}
+.rec-f{margin:12px 14px 14px; padding:11px 12px; background:var(--card); border:1px solid var(--line); border-radius:var(--r3); display:flex; gap:16px; flex-wrap:wrap; align-items:center}
+.rec-f .fx{font-size:11px; color:var(--ink3)}
+.rec-f .fx b{display:block; font-family:"JetBrains Mono",monospace; font-size:12.5px; color:var(--ink); font-weight:700; margin-top:2px}
+.rec-f .hint{flex:1 1 220px; font-size:11.5px; color:var(--ink2); font-style:italic; min-width:180px}
+
+/* ---------- покупки ---------- */
+.shopg{display:flex; flex-direction:column; gap:2px}
+.shopg .lbl{margin:12px 0 5px}
+.shopg label{display:flex; align-items:center; gap:9px; padding:7px 9px; border-radius:8px; font-size:13px; color:var(--ink2); cursor:pointer}
+.shopg label:hover{background:var(--mint)}
+.shopg input{appearance:none; width:16px; height:16px; border:1.5px solid var(--line2); border-radius:5px; flex:0 0 auto; display:grid; place-items:center; cursor:pointer}
+.shopg input:checked{background:var(--lime); border-color:var(--lime)}
+.shopg input:checked::after{content:""; width:8px; height:4px; border-left:2px solid var(--on-lime); border-bottom:2px solid var(--on-lime); transform:rotate(-45deg) translate(1px,-1px)}
+.shopg input:checked + span{text-decoration:line-through; color:var(--ink3)}
+.shopg label .amt{margin-left:auto; font-family:"JetBrains Mono",monospace; font-size:11.5px; color:var(--ink3); white-space:nowrap}
+
+/* ---------- заметки ---------- */
+.notes{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px}
+.note-c{padding:14px; background:var(--soft); border:1px solid var(--line); border-radius:var(--r2)}
+.note-c h4{font-size:14px; font-weight:700; margin-bottom:5px}
+.note-c p{font-size:12.5px; color:var(--ink2)}
+.callout{padding:14px 16px; border-radius:var(--r2); background:var(--carb-bg); border:1px solid var(--carb); border-left-width:3px; font-size:13px; color:var(--ink2); margin-bottom:12px}
+.callout b{color:var(--ink)}
+
+.meter{display:flex; gap:3px; align-items:center}
+.meter i{width:5px; height:5px; border-radius:50%; background:var(--line2)}
+.meter i.on{background:var(--dot)}
+.meter em{font-style:normal; font-family:"JetBrains Mono",monospace; font-size:10.5px; color:var(--ink3); margin-left:4px}
+
+.foot{padding:14px 18px; font-size:11.5px; color:var(--ink3); display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap}
+[hidden]{display:none!important}
+
+@media (max-width:1180px){
+  .shell{grid-template-columns:210px minmax(0,1fr)}
+  .rail{grid-column:1 / -1; position:static; flex-direction:row; flex-wrap:wrap}
+  .rail > .card{flex:1 1 300px}
+}
+@media (max-width:820px){
+  .shell{grid-template-columns:minmax(0,1fr); padding:10px; gap:10px}
+  .side{position:static; flex-direction:column}
+  .nav{flex-direction:row; overflow-x:auto; gap:5px; padding-bottom:4px}
+  .nav button{flex:0 0 auto; padding:8px 12px}
+  .nav button svg,.nav .count{display:none}
+  .hero{grid-template-columns:minmax(0,1fr); text-align:left}
+  .hero-ring{margin:0 auto}
+  .meal{grid-template-columns:44px minmax(0,1fr); gap:10px}
+  .meal-r{grid-column:1 / -1; justify-content:space-between}
+  .norms,.notes,.g2,.g3{grid-template-columns:minmax(0,1fr)}
+  .rec-b{grid-template-columns:minmax(0,1fr)}
+  .week{grid-template-columns:repeat(4,1fr)}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important; animation:none!important}}
+</style>
+
+<div class="shell">
+  <aside class="card side">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#1B2415" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 11h18"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 4v3"/><path d="M8 20h8"/>
+        </svg>
+      </span>
+      <span><b>Один котёл</b><span>план питания на двоих</span></span>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="who-switch">
+      <span class="lbl">Чья порция</span>
+      <div class="seg" id="seg" role="group" aria-label="Выбор человека">
+        <button type="button" data-who="w">Она</button>
+        <button type="button" data-who="m">Он</button>
+      </div>
+      <p class="who-meta" id="whoMeta"></p>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="card topbar">
+      <h1 id="pgTitle">Обзор</h1>
+      <span class="tag tg-ghost num" id="pgBadge"></span>
+      <p class="sub" id="pgSub"></p>
+    </div>
+    <div id="pages"></div>
+    <div class="card foot">
+      <span>Все КБЖУ рассчитаны из навесок по рецептам · округление до 5 г</span>
+      <span class="num" id="footAvg"></span>
+    </div>
+  </main>
+
+  <aside class="rail" id="rail"></aside>
+</div>
+
+<script>
+const PLAN = {"people":{"w":{"key":"w","name":"Она","meta":"базовая порция","note":"вес в норме, цель — форма","tdee":1940,"deficit":12,"kcal":1704,"prot":127,"fat":60,"carb":159,"gkg":1.95,"rate":"0,2 кг/нед"},"m":{"key":"m","name":"Он","meta":"порция с добавкой","note":"есть запас жировой массы","tdee":2540,"deficit":23,"kcal":1954,"prot":155,"fat":69,"carb":172,"gkg":1.73,"rate":"0,5–0,6 кг/нед"}},"targets":{"w":{"sr":1790,"pn":1790,"vs":1640,"vt":1640,"cht":1640,"pt":1790,"sb":1640},"m":{"sr":2050,"pn":2050,"vs":1880,"vt":1880,"cht":1880,"pt":2050,"sb":1880}},"days":[{"id":"pn","name":"Понедельник","sub":"день 1","badge":"зал","gym":true,"w":{"k":1784,"p":129,"f":71,"c":152},"m":{"k":2062,"p":162,"f":85,"c":157},"meals":[{"label":"Завтрак","title":"Творожная запеканка с изюмом","note":"Из воскресной закладки. Кофе с молоком, яблоко.","w":{"qty":"запеканка творожная 180 г, яблоко 150 г, молоко 2,5% 50 г","k":369,"p":31,"f":13,"c":32},"m":{"qty":"запеканка творожная 195 г, яйцо 1 шт, яблоко 120 г, молоко 2,5% 40 г","k":458,"p":39,"f":19,"c":31}},{"label":"Перекус","title":"Кефир с грецким орехом","note":"Орех отвесить заранее — на глаз это всегда вдвое больше.","w":{"qty":"кефир 1% 250 г, орех грецкий 15 г","k":198,"p":10,"f":12,"c":11},"m":{"qty":"кефир 1% 240 г, орех грецкий 16 г","k":201,"p":10,"f":13,"c":11}},{"label":"Обед","title":"Суп-гуляш из говядины с грибами","note":"Единственный день недели на говядине. Хлеб с семечками из хлебопечки.","w":{"qty":"суп-гуляш 400 г, хлеб 100 г","k":606,"p":35,"f":25,"c":59},"m":{"qty":"суп-гуляш 405 г, хлеб 120 г","k":667,"p":37,"f":26,"c":68}},{"label":"Перекус","title":"Творог с какао и корицей","note":"Ложка какао без сахара, подсластитель. Ему — плюс арахисовая паста.","w":{"qty":"творог 5% 100 г, какао 6 г","k":138,"p":19,"f":6,"c":2},"m":{"qty":"творог 5% 160 г, какао 5 г, паста арахисовая 6 г","k":244,"p":30,"f":12,"c":5}},{"label":"Ужин","title":"Минтай на пару, гречка, капустный салат","note":"Рыба в паровой корзине — 15 минут. Гречка готова с воскресенья.","w":{"qty":"минтай 150 г, гречка гот. 170 г, капуста 120 г, морковь 40 г, масло раст. 5 г","k":387,"p":34,"f":8,"c":44},"m":{"qty":"минтай 220 г, гречка гот. 160 г, капуста 95 г, морковь 30 г, масло раст. 4 г","k":407,"p":44,"f":8,"c":40}},{"label":"Вечер","title":"Горький шоколад 85%","note":"Две дольки. Обоим одинаково.","w":{"qty":"шоколад 85% 15 г","k":86,"p":2,"f":7,"c":3},"m":{"qty":"шоколад 85% 15 г","k":86,"p":2,"f":7,"c":3}}]},{"id":"vt","name":"Вторник","sub":"день 2","badge":"прогулка 2–3 км","gym":false,"w":{"k":1641,"p":114,"f":70,"c":134},"m":{"k":1882,"p":138,"f":79,"c":150},"meals":[{"label":"Завтрак","title":"Омлет-запеканка с грибами и кабачком","note":"Из вечерней закладки понедельника. Ломтик хлеба.","w":{"qty":"омлет-запеканка 230 г, хлеб 35 г","k":367,"p":25,"f":20,"c":20},"m":{"qty":"омлет-запеканка 230 г, хлеб 55 г","k":423,"p":27,"f":22,"c":29}},{"label":"Перекус","title":"Чиа-пудинг с протеином","note":"Замачивается с вечера: чиа, молоко, протеин, ягоды сверху.","w":{"qty":"чиа 8 г, молоко 2,5% 105 г, протеин 14 г, ягоды заморож. 40 г","k":165,"p":16,"f":6,"c":10},"m":{"qty":"чиа 9 г, молоко 2,5% 100 г, протеин 22 г, ягоды заморож. 35 г","k":196,"p":22,"f":6,"c":9}},{"label":"Обед","title":"Суп-гуляш, день второй","note":"На вторые сутки он вкуснее.","w":{"qty":"суп-гуляш 275 г, хлеб 70 г","k":420,"p":24,"f":17,"c":41},"m":{"qty":"суп-гуляш 285 г, хлеб 85 г","k":471,"p":26,"f":19,"c":48}},{"label":"Перекус","title":"Яблоко с арахисовой пастой","note":"Дольками. Паста без сахара и пальмового масла.","w":{"qty":"яблоко 105 г, паста арахисовая 8 г, творог 5% 55 г","k":164,"p":12,"f":7,"c":13},"m":{"qty":"яблоко 100 г, паста арахисовая 7 г, творог 5% 115 г","k":228,"p":22,"f":10,"c":13}},{"label":"Ужин","title":"Куриные бёдра из духовки, булгур, овощи с грибами","note":"Бёдра и овощи с воскресенья, булгур варится 15 минут.","w":{"qty":"бёдра запечённые 115 г, булгур гот. 90 г, овощи-гриль 105 г","k":435,"p":36,"f":20,"c":26},"m":{"qty":"бёдра запечённые 130 г, булгур гот. 95 г, овощи-гриль 100 г","k":474,"p":40,"f":22,"c":27}},{"label":"Вечер","title":"Зефир","note":"Классический белый. Жира в нём нет вовсе.","w":{"qty":"зефир 1 шт","k":90,"p":0,"f":0,"c":23},"m":{"qty":"зефир 1 шт","k":90,"p":0,"f":0,"c":23}}]},{"id":"sr","name":"Среда","sub":"день 3","badge":"зал","gym":true,"w":{"k":1780,"p":130,"f":68,"c":158},"m":{"k":2044,"p":158,"f":71,"c":187},"meals":[{"label":"Завтрак","title":"Омлет-запеканка, день второй","note":"Разогреть куском в духовке или на сухой сковороде.","w":{"qty":"омлет-запеканка 300 г, хлеб 50 г, помидор 100 г","k":511,"p":34,"f":27,"c":32},"m":{"qty":"омлет-запеканка 300 г, хлеб 80 г, помидор 80 г","k":591,"p":37,"f":29,"c":44}},{"label":"Перекус","title":"Творог с бананом","note":"Размять вилкой, посыпать кунжутом.","w":{"qty":"творог 5% 110 г, банан 100 г, кунжут 5 г","k":257,"p":21,"f":8,"c":24},"m":{"qty":"творог 5% 160 г, банан 90 г, кунжут 4 г","k":302,"p":30,"f":10,"c":22}},{"label":"Обед","title":"Плов из курицы","note":"Мультиварка, вечер вторника. Салат из капусты с морковью.","w":{"qty":"плов 280 г, капуста 120 г, морковь 40 г, масло раст. 5 г","k":423,"p":30,"f":11,"c":49},"m":{"qty":"плов 270 г, капуста 95 г, морковь 30 г, масло раст. 4 г","k":392,"p":28,"f":10,"c":45}},{"label":"Перекус","title":"Два яйца и огурец","note":"Яйца сварены в воскресенье. Ему — плюс хлебцы.","w":{"qty":"яйцо 2 шт, огурец 120 г","k":190,"p":15,"f":12,"c":4},"m":{"qty":"яйцо 2 шт, огурец 95 г, хлебец 2 шт","k":246,"p":17,"f":13,"c":15}},{"label":"Ужин","title":"Салат с тунцом и белой фасолью","note":"Сборка на 10 минут, пока в духовке минтай на завтра.","w":{"qty":"тунец с/с 90 г, фасоль конс. 120 г, помидор 150 г, огурец 100 г, лук 20 г, масло раст. 7 г","k":321,"p":30,"f":9,"c":30},"m":{"qty":"тунец с/с 165 г, фасоль конс. 120 г, помидор 120 г, огурец 80 г, лук 16 г, масло раст. 6 г, хлебец 2 шт","k":433,"p":47,"f":9,"c":40}},{"label":"Вечер","title":"Пастила","note":"Яблочная, без глазури.","w":{"qty":"пастила 25 г","k":80,"p":0,"f":0,"c":20},"m":{"qty":"пастила 25 г","k":80,"p":0,"f":0,"c":20}}]},{"id":"cht","name":"Четверг","sub":"день 4","badge":"прогулка 2–3 км","gym":false,"w":{"k":1644,"p":130,"f":43,"c":176},"m":{"k":1885,"p":157,"f":56,"c":179},"meals":[{"label":"Завтрак","title":"Протеиновые вафли с йогуртом и ягодами","note":"Мультипекарь, испечены в среду. Разогрев — тостер, минута.","w":{"qty":"вафля 180 г, йогурт греческий 85 г, ягоды заморож. 85 г","k":486,"p":45,"f":16,"c":38},"m":{"qty":"вафля 225 г, яйцо 1 шт, йогурт греческий 110 г, ягоды заморож. 65 г","k":677,"p":63,"f":26,"c":45}},{"label":"Перекус","title":"Мандарины с сыром","note":"Сыр нарезать заранее — так проще не увлечься.","w":{"qty":"мандарин 2 шт, сыр 45% 26 г","k":154,"p":7,"f":8,"c":12},"m":{"qty":"мандарин 2 шт, сыр 45% 29 г","k":165,"p":8,"f":9,"c":12}},{"label":"Обед","title":"Плов, день второй","note":"С тем же салатом. Квашеная капуста тоже подойдёт.","w":{"qty":"плов 280 г, капуста квашеная 125 г","k":355,"p":29,"f":6,"c":43},"m":{"qty":"плов 275 г, капуста квашеная 100 г","k":344,"p":28,"f":6,"c":42}},{"label":"Перекус","title":"Творог с какао","note":"Тот же рецепт, что в понедельник — он хорош тем, что не надоедает.","w":{"qty":"творог 5% 105 г, какао 6 г","k":144,"p":20,"f":6,"c":2},"m":{"qty":"творог 5% 155 г, какао 5 г","k":202,"p":28,"f":8,"c":3}},{"label":"Ужин","title":"Минтай под овощной шубой, картофель в мундире","note":"Из среды. Вся рыба в плане белая, красной нет нигде.","w":{"qty":"минтай под шубой 190 г, картофель отв. 295 г","k":415,"p":29,"f":6,"c":58},"m":{"qty":"минтай под шубой 200 г, картофель отв. 275 г","k":407,"p":30,"f":6,"c":55}},{"label":"Вечер","title":"Мармелад","note":"Желейный, без сахарной обсыпки — она добавляет треть.","w":{"qty":"мармелад 30 г","k":90,"p":0,"f":0,"c":23},"m":{"qty":"мармелад 30 г","k":90,"p":0,"f":0,"c":23}}]},{"id":"pt","name":"Пятница","sub":"день 5","badge":"зал","gym":true,"w":{"k":1796,"p":127,"f":56,"c":192},"m":{"k":2056,"p":160,"f":62,"c":211},"meals":[{"label":"Завтрак","title":"Овсянка на молоке с протеином","note":"Мультиварка на отложенном старте. Протеин вмешивать в тёплую, не горячую кашу — иначе свернётся.","w":{"qty":"хлопья овсяные 60 г, молоко 2,5% 175 г, протеин 23 г, яблоко 140 г","k":467,"p":31,"f":10,"c":60},"m":{"qty":"хлопья овсяные 65 г, молоко 2,5% 190 г, протеин 40 г, яблоко 140 г","k":559,"p":46,"f":12,"c":65}},{"label":"Перекус","title":"Хлебцы с творожным сыром и огурцом","note":"Сверху щепотка кунжута.","w":{"qty":"хлебец 2 шт, творожный сыр 35 г, огурец 115 г","k":157,"p":5,"f":8,"c":16},"m":{"qty":"хлебец 3 шт, творожный сыр 35 г, огурец 95 г","k":184,"p":6,"f":8,"c":21}},{"label":"Обед","title":"Минтай, день второй, с рисом","note":"Рис сварен в четверг вечером. Квашеная капуста.","w":{"qty":"минтай под шубой 230 г, рис гот. 175 г, капуста квашеная 115 г","k":424,"p":35,"f":7,"c":53},"m":{"qty":"минтай под шубой 285 г, рис гот. 180 г, капуста квашеная 95 г","k":473,"p":41,"f":9,"c":55}},{"label":"Перекус","title":"Греческий йогурт с мёдом","note":"Мёд отмерить ложкой, не лить.","w":{"qty":"йогурт греческий 195 г, мёд 12 г","k":155,"p":16,"f":4,"c":16},"m":{"qty":"йогурт греческий 255 г, мёд 11 г","k":188,"p":20,"f":5,"c":18}},{"label":"Ужин","title":"Лазанья с курицей и грибами","note":"Духовка, вечер пятницы. Дать постоять 20 минут после выпечки, иначе не режется.","w":{"qty":"лазанья 380 г, капуста 140 г, помидор 115 г, масло раст. 5 г","k":507,"p":39,"f":20,"c":45},"m":{"qty":"лазанья 455 г, капуста 115 г, помидор 95 г, масло раст. 4 г","k":566,"p":45,"f":21,"c":49}},{"label":"Вечер","title":"Горький шоколад 85%","note":"Пятница — можно под кино.","w":{"qty":"шоколад 85% 15 г","k":86,"p":2,"f":7,"c":3},"m":{"qty":"шоколад 85% 15 г","k":86,"p":2,"f":7,"c":3}}]},{"id":"sb","name":"Суббота","sub":"день 6","badge":"прогулка 2–3 км","gym":false,"w":{"k":1634,"p":129,"f":56,"c":149},"m":{"k":1882,"p":154,"f":70,"c":155},"meals":[{"label":"Завтрак","title":"Вафли, день второй, с бананом","note":"Оставшиеся четыре из среды. Ему — плюс яйцо.","w":{"qty":"вафля 180 г, банан 70 г, йогурт греческий 70 г","k":505,"p":44,"f":16,"c":45},"m":{"qty":"вафля 195 г, яйцо 1 шт, банан 75 г, йогурт греческий 60 г","k":623,"p":53,"f":23,"c":49}},{"label":"Перекус","title":"Яблоко с тыквенными семечками","note":"Семечки подсушить на сухой сковороде — вкус меняется полностью.","w":{"qty":"яблоко 130 г, семечки тыквенные 16 г","k":151,"p":5,"f":8,"c":15},"m":{"qty":"яблоко 125 г, семечки тыквенные 18 г","k":159,"p":6,"f":9,"c":14}},{"label":"Обед","title":"Лазанья, день второй","note":"Греется в духовке 15 минут, не в микроволновке — иначе бешамель расслоится.","w":{"qty":"лазанья 290 г, капуста квашеная 105 г","k":325,"p":29,"f":11,"c":28},"m":{"qty":"лазанья 300 г, капуста квашеная 85 г","k":332,"p":29,"f":11,"c":28}},{"label":"Перекус","title":"Творог с замороженными ягодами","note":"Ягоды разморозить прямо в твороге — дадут сок и цвет.","w":{"qty":"творог 5% 90 г, ягоды заморож. 70 г","k":140,"p":16,"f":5,"c":7},"m":{"qty":"творог 5% 135 г, ягоды заморож. 75 г","k":197,"p":24,"f":7,"c":8}},{"label":"Ужин","title":"Тефтели из индейки на пару, перловка","note":"Мультиварка, паровая корзина. Салат из свежих овощей.","w":{"qty":"тефтели 130 г, перловка гот. 150 г, помидор 90 г, огурец 90 г, масло раст. 4 г","k":407,"p":27,"f":13,"c":44},"m":{"qty":"тефтели 175 г, перловка гот. 150 г, помидор 75 г, огурец 75 г, масло раст. 4 г","k":465,"p":34,"f":16,"c":45}},{"label":"Вечер","title":"Какао на молоке","note":"Ложка какао, подсластитель. Заодно ещё 7 г белка.","w":{"qty":"молоко 1,5% 200 г, какао 6 г","k":105,"p":7,"f":4,"c":10},"m":{"qty":"молоко 1,5% 200 г, какао 6 г","k":105,"p":7,"f":4,"c":10}}]},{"id":"vs","name":"Воскресенье","sub":"день 7 · день закладки","badge":"прогулка 2–3 км","gym":false,"w":{"k":1652,"p":127,"f":57,"c":151},"m":{"k":1869,"p":158,"f":62,"c":163},"meals":[{"label":"Завтрак","title":"Яичница с тостом и помидором","note":"Единственный завтрак недели, который готовится с нуля — 7 минут.","w":{"qty":"яйцо 2 шт, хлеб 95 г, помидор 140 г, масло раст. 5 г","k":513,"p":24,"f":25,"c":47},"m":{"qty":"яйцо 2 шт, хлеб 115 г, помидор 115 г, масло раст. 4 г","k":555,"p":25,"f":25,"c":55}},{"label":"Перекус","title":"Кефир с бананом","note":"Можно взбить блендером — получится питьевой десерт.","w":{"qty":"кефир 1% 225 г, банан 85 г","k":171,"p":8,"f":2,"c":27},"m":{"qty":"кефир 1% 235 г, банан 85 г","k":175,"p":8,"f":3,"c":27}},{"label":"Обед","title":"Тефтели, день второй, с гречкой","note":"Гречка из свежей воскресной закладки. Квашеная капуста.","w":{"qty":"тефтели 140 г, гречка гот. 170 г, капуста квашеная 110 г","k":404,"p":32,"f":11,"c":44},"m":{"qty":"тефтели 155 г, гречка гот. 185 г, капуста квашеная 95 г","k":438,"p":35,"f":12,"c":47}},{"label":"Перекус","title":"Творог с какао","note":"Пока в мультиварке доходит суп-гуляш на следующую неделю.","w":{"qty":"творог 5% 95 г, какао 6 г","k":132,"p":18,"f":6,"c":2},"m":{"qty":"творог 5% 145 г, какао 5 г","k":190,"p":26,"f":8,"c":3}},{"label":"Ужин","title":"Крем-суп из шампиньонов с куриной грудкой","note":"Грудка запекается на том же противне, где были бёдра.","w":{"qty":"крем-суп грибной 315 г, филе куриное 110 г, семечки тыквенные 7 г","k":301,"p":36,"f":11,"c":15},"m":{"qty":"крем-суп грибной 315 г, филе куриное 185 г, семечки тыквенные 6 г","k":380,"p":54,"f":11,"c":15}},{"label":"Вечер","title":"Яблоко, запечённое с творогом и корицей","note":"Ставится в духовку вместе с запеканкой — отдельного включения не требует.","w":{"qty":"яблоко 150 г, творог 5% 50 г","k":131,"p":9,"f":3,"c":16},"m":{"qty":"яблоко 150 г, творог 5% 50 г","k":131,"p":9,"f":3,"c":16}}]}],"recipes":[{"key":"суп-гуляш","title":"Суп-гуляш из говядины с грибами","gear":"мультиварка · выход 2,4 кг","steps":["Единственное блюдо недели на говядине — она здесь раз в неделю, всё остальное мясо курица.","«Жарка», 10 мин: лук с морковью на масле, следом говядина — до изменения цвета.","Грибы четвертинками и томатная паста — ещё 5 минут, чтобы ушла лишняя влага и кислота.","Картофель, перец, 900 мл воды, лавровый лист. «Тушение» — 1,5 часа. Живёт 3 суток."],"hint":"Говядину можно заменить куриным бедром: минус 25 ккал и 4 г жира на порцию, время тушения — 40 минут.","ing":[{"n":"говядина","g":700,"txt":"700 г"},{"n":"шампиньоны","g":250,"txt":"250 г"},{"n":"картофель","g":350,"txt":"350 г"},{"n":"лук","g":150,"txt":"150 г"},{"n":"морковь","g":150,"txt":"150 г"},{"n":"томатная паста","g":50,"txt":"50 г"},{"n":"перец сладкий","g":120,"txt":"120 г"},{"n":"масло раст.","g":12,"txt":"12 г"}],"per100":{"k":81,"p":6.6,"f":4.2,"c":3.9},"pw":400,"pm":500,"vw":{"k":325,"p":26,"f":17,"c":16},"vm":{"k":406,"p":33,"f":21,"c":20}},{"key":"омлет-запеканка","title":"Омлет-запеканка с грибами и кабачком","gear":"духовка · выход 1,25 кг","steps":["Грибы обжарить отдельно до испарения влаги — сырые дадут воду и запеканка потечёт.","Кабачок натереть и отжать, помидоры нарезать и дать стечь.","Яйца взбить с молоком и солью, вмешать грибы и овощи.","Форма 22×22, лёгкий сыр — сверху на последние 10 минут. 180 °C, 30 минут."],"hint":"Резать остывшей, хранить 2 суток. Лёгкий сыр вместо обычного экономит 100 ккал на форму.","ing":[{"n":"яйцо","g":550,"txt":"10 шт · 550 г"},{"n":"молоко 2,5%","g":200,"txt":"200 г"},{"n":"шампиньоны","g":250,"txt":"250 г"},{"n":"кабачок","g":200,"txt":"200 г"},{"n":"помидор","g":150,"txt":"150 г"},{"n":"сыр лёгкий","g":100,"txt":"100 г"},{"n":"масло раст.","g":10,"txt":"10 г"}],"per100":{"k":117,"p":9.6,"f":7.7,"c":2.3},"pw":300,"pm":380,"vw":{"k":350,"p":29,"f":23,"c":7},"vm":{"k":443,"p":37,"f":29,"c":9}},{"key":"запеканка творожная","title":"Творожная запеканка с изюмом","gear":"духовка · выход 950 г","steps":["Манку залить молоком на 15 минут — это даёт плотность вместо резиновости.","Смешать с творогом, желтками, изюмом. Белки взбить отдельно и вмешать лопаткой.","Форма 20×20, 180 °C, 35–40 минут до сухой зубочистки.","Резать полностью остывшей. Держится 3 суток."],"hint":"Подсластитель и ванилин по вкусу, на КБЖУ не влияют.","ing":[{"n":"творог 5%","g":700,"txt":"700 г"},{"n":"яйцо","g":165,"txt":"3 шт · 165 г"},{"n":"манка","g":50,"txt":"50 г"},{"n":"молоко 2,5%","g":100,"txt":"100 г"},{"n":"изюм","g":40,"txt":"40 г"}],"per100":{"k":151,"p":15.8,"f":5.9,"c":8.4},"pw":200,"pm":260,"vw":{"k":302,"p":32,"f":12,"c":17},"vm":{"k":393,"p":41,"f":15,"c":22}},{"key":"вафля","title":"Протеиновые вафли","gear":"мультипекарь · 8 вафель по 68 г","steps":["Хлопья смолоть в муку. Всё в блендер, дать постоять 10 минут — тесто загустеет.","Панель для вафель прогреть, смазать кистью один раз, дальше не нужно.","По 75 г теста на вафлю, 4–5 минут до румяности.","Остужать на решётке, не стопкой. Холодильник 3 дня, морозилка месяц."],"hint":"КБЖУ указано на 1 вафлю. Разогрев — тостер, минута.","ing":[{"n":"хлопья овсяные","g":120,"txt":"120 г"},{"n":"творог 5%","g":250,"txt":"250 г"},{"n":"яйцо","g":165,"txt":"3 шт · 165 г"},{"n":"протеин","g":40,"txt":"40 г"},{"n":"молоко 2,5%","g":80,"txt":"80 г"}],"per100":{"k":220,"p":20.7,"f":7.8,"c":15.6},"pw":0,"pm":0,"vw":{"k":0,"p":0,"f":0,"c":0},"vm":{"k":0,"p":0,"f":0,"c":0}},{"key":"плов","title":"Плов из курицы","gear":"мультиварка · выход 1,75 кг","steps":["«Жарка»: лук, затем морковь соломкой, затем курица — 12 минут суммарно.","Промытый рис ровным слоем, не мешать. Зира, барбарис, головка чеснока сверху.","Залить водой на 1,5 см выше риса (≈550 мл), режим «Плов».","После сигнала — 15 минут под крышкой на подогреве, потом перемешать."],"hint":"Бедро вместо филе добавит ≈35 ккал и 3 г жира на порцию.","ing":[{"n":"филе куриное","g":600,"txt":"600 г"},{"n":"рис сухой","g":300,"txt":"300 г"},{"n":"морковь","g":250,"txt":"250 г"},{"n":"лук","g":150,"txt":"150 г"},{"n":"масло раст.","g":25,"txt":"25 г"}],"per100":{"k":118,"p":9.6,"f":2.3,"c":14.4},"pw":280,"pm":340,"vw":{"k":331,"p":27,"f":6,"c":40},"vm":{"k":402,"p":33,"f":8,"c":49}},{"key":"минтай под шубой","title":"Минтай под овощной шубой","gear":"духовка · выход 1,3 кг","steps":["Минтай обсушить бумажным полотенцем, посолить, сбрызнуть лимоном, оставить на 10 минут — он водянистее трески.","Морковь, лук и грибы припустить 7 минут, смешать со сметаной и помидорами.","Рыба в форму, сверху шуба, лёгкий сыр — на последние 10 минут.","190 °C, 25–30 минут. На второй день разогревать в духовке, не в микроволновке."],"hint":"Треска или хек взаимозаменяемы с минтаем один к одному и дают на 5 г белка больше на порцию.","ing":[{"n":"минтай","g":800,"txt":"800 г"},{"n":"шампиньоны","g":150,"txt":"150 г"},{"n":"морковь","g":200,"txt":"200 г"},{"n":"лук","g":150,"txt":"150 г"},{"n":"помидор","g":200,"txt":"200 г"},{"n":"сметана 15%","g":60,"txt":"60 г"},{"n":"сыр лёгкий","g":60,"txt":"60 г"},{"n":"масло раст.","g":10,"txt":"10 г"}],"per100":{"k":86,"p":12.3,"f":3,"c":2.7},"pw":200,"pm":260,"vw":{"k":173,"p":25,"f":6,"c":5},"vm":{"k":225,"p":32,"f":8,"c":7}},{"key":"тефтели","title":"Тефтели из индейки на пару","gear":"мультиварка · выход 950 г","steps":["Кабачок натереть и отжать досуха — иначе тефтели расплывутся. Он здесь вместо хлеба и жира.","Вымесить, отбить об миску, убрать в холод на 20 минут.","Шарики по 45 г в паровую корзину, вода в чаше, «Пар» — 30 минут.","Хранятся 3 суток, отлично мёрзнут сырыми."],"hint":"Индейка здесь раз в неделю. Куриный фарш работает так же — минус 4 ккал на 100 г; говяжий поднимет жирность вдвое.","ing":[{"n":"фарш индейки","g":700,"txt":"700 г"},{"n":"кабачок","g":150,"txt":"150 г"},{"n":"лук","g":100,"txt":"100 г"},{"n":"яйцо","g":55,"txt":"1 шт · 55 г"},{"n":"хлопья овсяные","g":40,"txt":"40 г"}],"per100":{"k":140,"p":16.3,"f":6.1,"c":4.2},"pw":170,"pm":220,"vw":{"k":238,"p":28,"f":10,"c":7},"vm":{"k":307,"p":36,"f":13,"c":9}},{"key":"лазанья","title":"Лазанья с курицей и грибами","gear":"духовка · выход 2,3 кг","steps":["Начинка: лук с морковью на масле, следом куриный фарш, следом грибы — жарить, пока не уйдёт вся влага. Помидоры и паста, 15 минут на медленном.","Бешамель на молоке: муку прогреть на сухой сковороде до орехового запаха, влить молоко тонкой струйкой, довести до густоты сметаны. Масло сюда не нужно — мука уже прогрета.","Слои: соус снизу, лист, начинка, бешамель — и так четыре раза. Лёгкий сыр только на верх.","180 °C, 40 минут под фольгой + 10 без. Дать постоять 20 минут, иначе не режется."],"hint":"Грибы здесь заменяют половину мяса по объёму: за счёт них порция 330 г весит всего 345 ккал. Хранится 3 суток, греется в духовке.","ing":[{"n":"фарш куриный","g":600,"txt":"600 г"},{"n":"шампиньоны","g":400,"txt":"400 г"},{"n":"лук","g":150,"txt":"150 г"},{"n":"морковь","g":150,"txt":"150 г"},{"n":"помидор","g":300,"txt":"300 г"},{"n":"томатная паста","g":60,"txt":"60 г"},{"n":"листы лазаньи","g":150,"txt":"150 г"},{"n":"молоко 2,5%","g":500,"txt":"500 г"},{"n":"мука пшеничная","g":40,"txt":"40 г"},{"n":"масло раст.","g":15,"txt":"15 г"},{"n":"сыр лёгкий","g":120,"txt":"120 г"}],"per100":{"k":105,"p":9.3,"f":3.7,"c":8.9},"pw":330,"pm":420,"vw":{"k":348,"p":31,"f":12,"c":29},"vm":{"k":442,"p":39,"f":16,"c":37}},{"key":"крем-суп грибной","title":"Крем-суп из шампиньонов","gear":"мультиварка · выход 1,9 кг","steps":["Треть грибов отложить: их обжарить отдельно пластинками и бросить в тарелку сверху — иначе суп получится однородным и скучным.","«Жарка»: лук и остальные грибы на масле до золотистого, 10 минут. Мука — в конце, перемешать.","Картофель и 700 мл воды, режим «Суп» — 20 минут.","Пробить блендером, влить молоко, прогреть не кипятя. Подавать с запечённой грудкой."],"hint":"Шампиньоны — 27 ккал на 100 г: главный продукт в дефиците, когда хочется объёма, а не калорий.","ing":[{"n":"шампиньоны","g":700,"txt":"700 г"},{"n":"картофель","g":250,"txt":"250 г"},{"n":"лук","g":150,"txt":"150 г"},{"n":"молоко 2,5%","g":400,"txt":"400 г"},{"n":"мука пшеничная","g":20,"txt":"20 г"},{"n":"масло раст.","g":12,"txt":"12 г"}],"per100":{"k":44,"p":2.7,"f":1.6,"c":4.5},"pw":320,"pm":380,"vw":{"k":140,"p":9,"f":5,"c":14},"vm":{"k":166,"p":10,"f":6,"c":17}},{"key":"бёдра запечённые","title":"Куриные бёдра на противне","gear":"духовка · выход 600 г","steps":["Бёдра без кожи и костей, замариновать в паприке, чесноке, соли — 15 минут.","Решётка или противень с бортом, 200 °C, 35–40 минут.","На нижнем уровне одновременно — противень овощей.","Ужарка около 25%: из 800 г сырых выходит 600 г готовых."],"hint":"Считайте готовый вес: в меню граммы указаны для запечённых бёдер.","ing":[{"n":"бедро куриное б/к","g":800,"txt":"800 г"},{"n":"масло раст.","g":15,"txt":"15 г"}],"per100":{"k":242,"p":26.7,"f":14.5,"c":0},"pw":140,"pm":200,"vw":{"k":339,"p":37,"f":20,"c":0},"vm":{"k":485,"p":53,"f":29,"c":0}},{"key":"овощи-гриль","title":"Овощи с грибами с противня","gear":"духовка · выход 850 г","steps":["Крупным кубиком, грибы половинками, перемешать с маслом и травами прямо на противне.","200 °C, 30 минут, один раз перемешать.","Печётся одновременно с бёдрами — второе включение духовки не нужно."],"hint":"Зимой — замороженная овощная смесь плюс свежие грибы, время то же.","ing":[{"n":"кабачок","g":300,"txt":"300 г"},{"n":"шампиньоны","g":200,"txt":"200 г"},{"n":"перец сладкий","g":200,"txt":"200 г"},{"n":"лук","g":150,"txt":"150 г"},{"n":"помидор","g":200,"txt":"200 г"},{"n":"масло раст.","g":20,"txt":"20 г"}],"per100":{"k":54,"p":2.2,"f":2.8,"c":5.2},"pw":150,"pm":180,"vw":{"k":82,"p":3,"f":4,"c":8},"vm":{"k":98,"p":4,"f":5,"c":9}},{"key":"хлеб","title":"Хлеб с семечками","gear":"хлебопечка · буханка 750 г","steps":["Закладка по инструкции печки: 300 мл тёплой воды вниз, мука сверху, дрожжи в лунку — они не должны касаться соли и воды до старта.","Соль 8 г по углу ведра. Режим «Цельнозерновой», корочка средняя.","Семечки — в диспенсер либо вручную по сигналу второго замеса.","Отложенный старт на утро. Буханка — 15 ломтиков по 50 г, хватает на 3–4 дня."],"hint":"КБЖУ указано на 100 г и на ломтик 50 г.","ing":[{"n":"мука пшеничная","g":300,"txt":"300 г"},{"n":"мука ц/з","g":150,"txt":"150 г"},{"n":"дрожжи","g":7,"txt":"7 г"},{"n":"сахар","g":10,"txt":"10 г"},{"n":"масло раст.","g":20,"txt":"20 г"},{"n":"семечки тыквенные","g":30,"txt":"30 г"},{"n":"семечки подсолн.","g":20,"txt":"20 г"},{"n":"кунжут","g":15,"txt":"15 г"}],"per100":{"k":282,"p":8.9,"f":7.9,"c":43.2},"pw":0,"pm":0,"vw":{"k":0,"p":0,"f":0,"c":0},"vm":{"k":0,"p":0,"f":0,"c":0}}],"snacks":[{"title":"Творог с какао","qty":"творог 5% 110 г, какао 5 г","note":"самый белковый на рубль","k":148,"p":20,"f":6,"c":2},{"title":"Чиа-пудинг с протеином","qty":"чиа 12 г, молоко 2,5% 150 г, протеин 12 г, ягоды заморож. 50 г","note":"готовится с вечера, 5 г клетчатки","k":205,"p":16,"f":8,"c":13},{"title":"Кефир с грецким орехом","qty":"кефир 1% 250 г, орех грецкий 15 г","note":"вечерний, хорошо перед сном","k":198,"p":10,"f":12,"c":11},{"title":"Два яйца и огурец","qty":"яйцо 2 шт, огурец 120 г","note":"берётся с собой","k":190,"p":15,"f":12,"c":4},{"title":"Греческий йогурт с ягодами","qty":"йогурт греческий 150 г, ягоды заморож. 80 г","note":"ягоды можно замороженные","k":126,"p":13,"f":3,"c":12},{"title":"Яблоко с арахисовой пастой","qty":"яблоко 150 г, паста арахисовая 12 г","note":"для дней, когда белка и так много","k":142,"p":4,"f":7,"c":17},{"title":"Хлебцы с творожным сыром","qty":"хлебец 2 шт, творожный сыр 25 г, огурец 80 г","note":"30 секунд на сборку","k":129,"p":4,"f":6,"c":15},{"title":"Мандарины с сыром","qty":"мандарин 2 шт, сыр лёгкий 25 г","note":"зимний вариант","k":125,"p":9,"f":5,"c":12},{"title":"Яблоко с тыквенными семечками","qty":"яблоко 150 г, семечки тыквенные 15 г","note":"магний и цинк","k":154,"p":5,"f":8,"c":17},{"title":"Протеиновый шейк на молоке","qty":"протеин 25 г, молоко 1,5% 200 г","note":"аварийный вариант, когда нет времени","k":184,"p":26,"f":4,"c":11},{"title":"Шампиньоны на гриле с сыром","qty":"шампиньоны 200 г, сыр лёгкий 25 г, масло раст. 4 г","note":"много объёма на мало калорий","k":154,"p":16,"f":10,"c":0},{"title":"Творожная запеканка, кусок","qty":"запеканка творожная 110 г","note":"если осталась с завтрака","k":166,"p":17,"f":7,"c":9}],"sweets":[{"title":"Горький шоколад 85%","qty":"шоколад 85% 15 г","note":"чем выше какао, тем меньше хочется третью дольку","k":86,"p":2,"f":7,"c":3},{"title":"Зефир белый","qty":"зефир 1 шт","note":"жира нет вообще","k":90,"p":0,"f":0,"c":23},{"title":"Пастила яблочная","qty":"пастила 25 г","note":"без глазури","k":80,"p":0,"f":0,"c":20},{"title":"Мармелад желейный","qty":"мармелад 30 г","note":"без сахарной обсыпки — она добавляет треть","k":90,"p":0,"f":0,"c":23},{"title":"Какао на молоке","qty":"молоко 1,5% 200 г, какао 6 г","note":"и ещё 7 г белка в зачёт","k":105,"p":7,"f":4,"c":10},{"title":"Протеиновый мусс","qty":"творог 5% 60 г, протеин 10 г, какао 5 г","note":"взбить блендером до крема","k":126,"p":20,"f":4,"c":2},{"title":"Запечённое яблоко с творогом","qty":"яблоко 150 г, творог 5% 50 г","note":"печётся заодно с чем угодно в духовке","k":131,"p":9,"f":3,"c":16},{"title":"Финики с арахисовой пастой","qty":"финик 2 шт, паста арахисовая 5 г","note":"для дня после зала","k":75,"p":2,"f":3,"c":12},{"title":"Вафля с какао","qty":"вафля 68 г, какао 4 г","note":"тесто то же, плюс ложка какао","k":161,"p":15,"f":6,"c":11}]};
+
+/* ---------- иконки ---------- */
+const ICON = {
+  home:'<path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/>',
+  week:'<rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/>',
+  book:'<path d="M4 4.5h9a3 3 0 0 1 3 3v12a2.5 2.5 0 0 0-2.5-2.5H4z"/><path d="M20 4.5h-4v12.5h1.5A2.5 2.5 0 0 1 20 19.5z"/>',
+  snack:'<circle cx="12" cy="12" r="8"/><path d="M9 10.5h.01M15 10.5h.01M9 15c1.8 1.4 4.2 1.4 6 0"/>',
+  cart:'<circle cx="9.5" cy="19.5" r="1.4"/><circle cx="17.5" cy="19.5" r="1.4"/><path d="M2.5 3.5h2.6l2.2 11h11"/><path d="M6.4 6.9h14l-1.6 6.4H7.6"/>',
+  fire:'<path d="M12 3s5 4.2 5 9a5 5 0 0 1-10 0c0-2 1-3.4 1.8-4.3.3 1.6 1.2 2.3 1.9 2.3 1.1 0 1.6-1 1.3-2.6C11.7 5.8 12 3 12 3z"/>',
+  note:'<path d="M6 3.5h12v17l-6-3.2-6 3.2z"/>',
+  pot:'<path d="M3.5 8.5h17"/><path d="M5.5 8.5v8a3 3 0 0 0 3 3h7a3 3 0 0 0 3-3v-8"/><path d="M8.5 5v2M15.5 5v2"/>',
+  wheat:'<path d="M12 21V9"/><path d="M12 9c0-2.5 2-4.5 4.5-4.5C16.5 7 14.5 9 12 9z"/><path d="M12 9C12 6.5 10 4.5 7.5 4.5 7.5 7 9.5 9 12 9z"/><path d="M12 15c0-2.2 1.8-4 4-4 0 2.2-1.8 4-4 4z"/><path d="M12 15c0-2.2-1.8-4-4-4 0 2.2 1.8 4 4 4z"/>',
+  drop:'<path d="M12 3.5s5.5 6 5.5 9.6a5.5 5.5 0 1 1-11 0C6.5 9.5 12 3.5 12 3.5z"/>',
+  leaf:'<path d="M20 4C10 4 4.5 8 4.5 14.5A5.5 5.5 0 0 0 10 20c6.5 0 10-5.5 10-16z"/><path d="M4.5 20C8 15 12 12.5 16 11"/>',
+  chev:'<path d="m6 9 6 6 6-6"/>'
+};
+const svg = (k,cls) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"${cls?` class="${cls}"`:''}>${ICON[k]}</svg>`;
+
+/* ---------- утилиты ---------- */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const nf = n => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g,' ');
+
+/* донат макросов: доли по калорийности Б/Ж/У */
+function donut(p,f,c,size,thick){
+  const kp=p*4, kf=f*9, kc=c*4, t=kp+kf+kc||1;
+  const r=(size-thick)/2, C=2*Math.PI*r, cx=size/2;
+  const segs=[[kp,'var(--prot)'],[kf,'var(--fat)'],[kc,'var(--carb)']]; // белок · жиры · углеводы
+  let off=0, out='';
+  for(const [v,col] of segs){
+    const len=C*v/t;
+    if(len<=0.3){ off+=len; continue; }
+    out+=`<circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="${col}" stroke-width="${thick}" stroke-linecap="round"
+      stroke-dasharray="${Math.max(0,len-2).toFixed(2)} ${(C-len+2).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}"/>`;
+    off+=len;
+  }
+  return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" style="transform:rotate(-90deg)" aria-hidden="true">
+    <circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="var(--sunk)" stroke-width="${thick}"/>${out}</svg>`;
+}
+/* плотность белка: г на 100 ккал */
+function density(p,k){ return k? p/k*100 : 0; }
+function meter(p,k){
+  const d=density(p,k), n=Math.max(1,Math.min(10,Math.round(d)));
+  let dots=''; for(let i=0;i<10;i++) dots+=`<i class="${i<n?'on':''}"></i>`;
+  return `<span class="meter" title="Белка на 100 ккал">${dots}<em>${d.toFixed(1)} Б/100</em></span>`;
+}
+const TAG = {'Завтрак':'tg-br','Обед':'tg-lu','Ужин':'tg-di','Перекус':'tg-sn','Вечер':'tg-sw'};
+const TAGN = {'Вечер':'Сладкое'};
+
+function tiles(v){
+  const rows=[['t-kcal','fire','Калории',nf(v.k)+' ккал'],['t-prot','leaf','Белок',v.p+' г'],
+              ['t-fat','drop','Жиры',v.f+' г'],['t-carb','wheat','Углеводы',v.c+' г']];
+  return `<div class="tiles">${rows.map(([c,i,t,val])=>
+    `<div class="tile ${c}"><span class="t-i">${svg(i)}</span><span><span class="t-t">${t}</span><span class="t-v">${val}</span></span></div>`).join('')}</div>`;
+}
+
+/* ---------- статический контент ---------- */
+const COOK = [
+  ['Вс','главная','~55 мин',true,'<b>Суп-гуляш с грибами</b> (обеды пн+вт), <b>куриные бёдра и овощи</b> в духовке (ужин вт), <b>творожная запеканка</b>, гречка, 6 яиц, крем-суп на сегодня, хлеб в хлебопечке на отложенном старте'],
+  ['Пн','вечер','~10 мин',false,'<b>Омлет-запеканка с грибами</b> — духовка 30 мин → завтраки вт и ср'],
+  ['Вт','вечер','~15 мин',false,'<b>Плов из курицы</b> — мультиварка → обеды ср и чт'],
+  ['Ср','вечер','~35 мин',false,'<b>Минтай под шубой</b> (ужин чт + обед пт), <b>протеиновые вафли</b> 8 шт, рис, чиа-пудинг по банкам'],
+  ['Пт','вечер','~35 мин',false,'<b>Лазанья с курицей и грибами</b> — духовка 50 мин → ужин пт + обед сб. Вторая буханка на отложенном старте'],
+  ['Сб','вечер','~30 мин',false,'<b>Тефтели из индейки на пару</b> (ужин сб + обед вс), перловка на 2 дня']
+];
+const RULES = [
+  ['Порции','Женская порция — база','Готовите одну кастрюлю. Она накладывает базовую порцию, он берёт ту же плюс четверть гарнира и один белковый блок. Никаких отдельных блюд «для него» — только другой половник.'],
+  ['Белковый блок','Протеин закрывает разрыв','Ему нужно на 30 г белка в день больше — это не «больше еды», а плотнее еда. Блок = 90 г мяса, или 2 яйца, или 60 г творога, или 30 г сливочного протеина (115 ккал / 24 г Б).'],
+  ['Мясо','Курица по умолчанию, грибы для объёма','Курица во всех горячих, кроме двух: говядина один раз (гуляш), индейка один раз (тефтели). Рыба только минтай. Шампиньоны — 27 ккал на 100 г, заменяют половину мяса по объёму.'],
+  ['Два дня','Каждое горячее — на два раза','Ни одно блюдо не готовится на один приём. Одна большая закладка в воскресенье, дальше короткие вечерние по 10–35 минут.'],
+  ['Сладкое','Слот до 100 ккал каждый день','Сладкое заложено в норму, а не отнято от неё. Это строка бюджета, а не срыв — именно поэтому дефицит держится дольше трёх недель.'],
+  ['Точность','Считано, а не прикинуто','Рецепты посчитаны из навески и выхода, меню собрано из рецептов, навески подогнаны под целевые калории дня. Ни одна цифра не взята из таблицы «готовых блюд».']
+];
+const SHOP = [
+  ['Чижик, еженедельно','Основная закупка, один заход',[
+    ['Белок',[['Куриное филе','1,4 кг'],['Куриное бедро без кожи','1,4 кг'],['Фарш куриный','600 г'],['Минтай, филе','1,6 кг'],['Говядина, мякоть','700 г'],['Фарш индейки','700 г'],['Яйца','30 шт']]],
+    ['Молочное',[['Творог 5%','2,4 кг'],['Кефир 1%','2 л'],['Молоко 1,5–2,5%','3,5 л'],['Греческий йогурт','1,2 кг'],['Сметана 15%','200 г'],['Сыр лёгкий','400 г'],['Творожный сыр','180 г']]],
+    ['Овощи и фрукты',[['Шампиньоны','2,2 кг'],['Картофель','2 кг'],['Капуста белокочанная','1,2 кг'],['Морковь / лук','по 1 кг'],['Кабачки, помидоры, огурцы','2 кг'],['Перец сладкий','500 г'],['Яблоки','1,5 кг'],['Бананы','1,2 кг'],['Мандарины','1 кг'],['Зелень, чеснок, лимон','—']]]
+  ]],
+  ['Впрок и по случаю','Самовывоз со скидкой — ассортимент лотерейный, берите что есть',[
+    ['Крупы и мука',[['Овсяные хлопья','1,5 кг'],['Гречка','1 кг'],['Рис пропаренный','1 кг'],['Булгур, перловка','по 500 г'],['Листы для лазаньи','2 пачки'],['Мука пшеничная','2 кг'],['Мука цельнозерновая','1 кг'],['Манка','500 г']]],
+    ['Долгие запасы',[['Тунец в собственном соку','3 банки'],['Фасоль белая консервированная','3 банки'],['Томатная паста','2 банки'],['Ягоды замороженные','1 кг'],['Арахисовая паста','350 г'],['Орехи грецкие','300 г'],['Масло растительное','—'],['Дрожжи сухие','упаковка'],['Хлебцы','2 пачки']]],
+    ['Сладкий бюджет',[['Шоколад горький 85%','2 плитки'],['Зефир','250 г'],['Пастила / мармелад','250 г'],['Какао-порошок','200 г'],['Финики','200 г'],['Мёд','250 г']]],
+    ['Уже есть дома',[['Протеин сливочный','~500 г/нед'],['Семена чиа','~150 г/нед'],['Семечки тыквенные','~150 г/нед'],['Подсолнечные, кунжут','по 80 г']]]
+  ]]
+];
+const NOTES = [
+  ['Аллергия','Красной рыбы нет ни в одном приёме. Вся рыба — минтай и консервированный тунец. Омега-3 закрывают грецкие орехи и семена чиа; хотите усилить — льняное масло в салаты.'],
+  ['Замены мяса','Всё считано на курице. Бедро вместо филе — плюс 50 ккал и 7 г жира на 100 г. Говядина вместо курицы в гуляше — плюс 25 ккал. Куриный фарш вместо индейки — минус 4 ккал. Треска или хек вместо минтая — плюс 5 г белка на порцию.'],
+  ['Грибы','27 ккал на 100 г — самый выгодный продукт в дефиците. 200 г шампиньонов в любое блюдо это всего 55 ккал, зато порция заметно больше. Обжаривать отдельно до испарения влаги.'],
+  ['Главный инструмент — весы, а не формула','Любой расчёт поддержки это гипотеза с разбросом ±15%. Через 2–3 недели смотрите на динамику: он теряет меньше 0,3 кг в неделю — снимайте ещё 100–150 ккал с углеводов гарнира. Она теряет быстрее 0,4 кг — возвращайте 100 ккал.'],
+  ['Дни зала','Углеводы лучше сдвинуть на приёмы до и после тренировки. Если зал вечером — гарнир побольше в обед и ужин, а утром белковый завтрак без каши.'],
+  ['Вода и соль','2–2,5 л ему, 1,8–2 л ей. На дефиците вес прыгает на литр-полтора от одной солёной еды — взвешивайтесь раз в неделю утром, а не каждый день.'],
+  ['Чем заменить протеин','Если порошок закончился: 30 г ≈ 130 г творога, или 120 г куриной грудки, или 4 белка. Калорий станет чуть больше — уберите ломтик хлеба.'],
+  ['Границы плана','План для здоровых людей без диагнозов. При проблемах с ЖКТ, щитовидной железой, диабете, а также если планируется беременность — цифры должен утвердить врач.']
+];
+
+/* ---------- состояние ---------- */
+const store = {
+  get(k,d){ try{ const v=localStorage.getItem(k); return v===null?d:JSON.parse(v);}catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+};
+let who = store.get('kotel.who','w')==='m'?'m':'w';
+let page = 'home';
+let day = 0;
+let checked = store.get('kotel.shop',{}) || {};
+
+const PAGES = [
+  ['home','Обзор','home'],
+  ['week','Неделя','week'],
+  ['recipes','Рецепты','book'],
+  ['snacks','Перекусы','snack'],
+  ['cook','Готовка','pot'],
+  ['shop','Покупки','cart'],
+  ['notes','Правки','note']
+];
+const SUBS = {
+  home:'Нормы, недельная раскладка и принцип, по которому одна готовка кормит двоих',
+  week:'Семь дней, 42 приёма пищи. Каждая навеска посчитана из рецептов',
+  recipes:'Двенадцать заготовок, из которых собрано всё меню',
+  snacks:'Взаимозаменяемые перекусы и ежедневный слот сладкого',
+  cook:'Одна большая закладка и короткие вечерние — что и когда',
+  shop:'Разделено по логике доступа: скоропорт рядом с домом, длинное хранение по случаю',
+  notes:'Допущения, замены и то, на что смотреть через три недели'
+};
+
+/* ---------- рендер ---------- */
+function renderNav(){
+  document.getElementById('nav').innerHTML = PAGES.map(([id,t,ic])=>{
+    const c = id==='week' ? PLAN.days.length : id==='recipes' ? PLAN.recipes.length
+            : id==='snacks' ? PLAN.snacks.length+PLAN.sweets.length : '';
+    return `<button type="button" data-page="${id}" aria-current="${id===page}">${svg(ic)}<span>${t}</span>${c?`<span class="count">${c}</span>`:''}</button>`;
+  }).join('');
+}
+function renderWho(){
+  document.querySelectorAll('#seg button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.who===who));
+  const P = PLAN.people[who];
+  document.getElementById('whoMeta').innerHTML =
+    `<b>${nf(P.kcal)} ккал</b> в среднем за день<br>${esc(P.meta)}<br>белок ${P.prot} г · ${String(P.gkg).replace(".",",")} г/кг`;
+  document.getElementById('footAvg').textContent =
+    `${PLAN.people.w.name}: ${nf(PLAN.people.w.kcal)} ккал · ${PLAN.people.m.name}: ${nf(PLAN.people.m.kcal)} ккал`;
+}
+
+function pageHome(){
+  const W=PLAN.people.w, M=PLAN.people.m;
+  const norm = P => `<div class="norm${P.key===who?' on':''}">
+      <div class="norm-h"><h3>${P.name}</h3><span class="meta">${esc(P.meta)} · ${esc(P.note)}</span></div>
+      <p class="big">${nf(P.kcal)} <span>ккал/день</span></p>
+      <dl class="stack">
+        <dt>Поддержка</dt><dd>~${nf(P.tdee)} ккал</dd>
+        <dt>Дефицит</dt><dd>−${P.deficit}%</dd>
+        <dt>Белок</dt><dd><b>${P.prot} г</b> · ${String(P.gkg).replace('.',',')} г/кг</dd>
+        <dt>Жиры</dt><dd><b>${P.fat} г</b></dd>
+        <dt>Углеводы</dt><dd><b>${P.carb} г</b></dd>
+        <dt>Темп</dt><dd>${P.rate}</dd>
+      </dl></div>`;
+  const mx = Math.max(...PLAN.days.map(d=>d[who].k));
+  const bars = PLAN.days.map((d,i)=>`
+    <button type="button" class="wk" data-day="${i}" aria-pressed="${i===day}">
+      <span class="d">${d.name.slice(0,2)}</span>
+      <span class="bar"><span class="fill" style="height:${Math.round(d[who].k/mx*100)}%"></span></span>
+      <span class="k">${nf(d[who].k)}</span>
+      ${d.gym?'<span class="g" title="день зала"></span>':'<span class="g" style="background:transparent"></span>'}
+    </button>`).join('');
+  return `
+  <div class="card sec">
+    <div class="sec-h"><h2>Нормы</h2><span class="lbl">расчёт по Миффлину–Сан Жеору, коэффициент 1,375</span></div>
+    <div class="norms">${norm(W)}${norm(M)}</div>
+    <p class="lead" style="margin-top:12px">Коэффициент активности снижен до 1,375: три зала и пара прогулок в неделю не компенсируют сидячий день. Дальше пути расходятся. Там, где есть заметный запас жировой массы, дефицит углублён до 23% — это безопасно и даёт около полукилограмма в неделю. Там, где вес уже в норме, оставлены 12%: глубже начинается зона, в которой на тренировочном дне доступной энергии остаётся меньше 30 ккал на килограмм сухой массы, а это бьёт по гормональному фону и по той самой мышечной массе, ради которой ходят в зал.</p>
+  </div>
+  <div class="card sec">
+    <div class="sec-h"><h2>Неделя в калориях</h2><span class="lbl">точка — день зала · ${PLAN.people[who].name.toLowerCase()}</span></div>
+    <div class="week">${bars}</div>
+  </div>
+  <div class="card sec">
+    <div class="sec-h"><h2>Как это работает на кухне</h2></div>
+    <div class="grid g3">${RULES.map(([l,t,p])=>
+      `<div class="item"><span class="lbl">${l}</span><h4>${t}</h4><p class="q">${p}</p></div>`).join('')}</div>
+  </div>`;
+}
+
+function mealRow(m){
+  const v=m[who], cls=TAG[m.label]||'tg-ghost', nm=TAGN[m.label]||m.label;
+  return `<div class="meal">
+    ${donut(v.p,v.f,v.c,44,7)}
+    <div>
+      <div class="meal-h"><h4>${esc(m.title)}</h4><span class="tag ${cls}">${nm}</span></div>
+      <p class="qty">${esc(v.qty)}</p>
+      <p class="note">${esc(m.note)}</p>
+    </div>
+    <div class="meal-r">
+      <span class="macro-mini">
+        <span class="mm mm-p">Б ${v.p}</span><span class="mm mm-f">Ж ${v.f}</span><span class="mm mm-c">У ${v.c}</span>
+      </span>
+      <span class="kcal-b"><b>${nf(v.k)}</b><span>ккал</span></span>
+    </div>
+  </div>`;
+}
+function pageWeek(){
+  const d=PLAN.days[day], v=d[who], tgt=PLAN.targets[who][d.id];
+  const tabs = PLAN.days.map((x,i)=>
+    `<button type="button" data-day="${i}" aria-pressed="${i===day}">${x.name.slice(0,3)}<i>${nf(x[who].k)}</i></button>`).join('');
+  return `
+  <div class="card pillbar">${tabs}</div>
+  <div class="card hero">
+    <div class="hero-ring">
+      ${donut(v.p,v.f,v.c,148,15)}
+      <span class="mid"><b>${nf(v.k)}</b><span>ккал · цель ${nf(tgt)}</span></span>
+    </div>
+    <div class="hero-body">
+      <h3>${esc(d.name)}</h3>
+      <p class="note">${esc(d.sub)} · ${d.meals.length} приёмов пищи · порция: ${PLAN.people[who].name.toLowerCase()}</p>
+      <div class="hero-tags">
+        <span class="tag ${d.gym?'tg-gym':'tg-ghost'}">${esc(d.badge)}</span>
+        <span class="tag tg-ghost">${meter(v.p,v.k)}</span>
+      </div>
+      <p class="lead" style="font-size:13px">Кольцо показывает, из чего набраны калории дня: оранжевый — белок, серый — жир, жёлтый — углеводы.</p>
+    </div>
+    ${tiles(v)}
+  </div>
+  <div class="card sec">
+    <div class="sec-h"><h2>Приёмы пищи</h2><span class="lbl">навеска для: ${PLAN.people[who].name.toLowerCase()}</span></div>
+    <div class="meals">${d.meals.map(mealRow).join('')}</div>
+  </div>`;
+}
+
+function pageRecipes(){
+  return `<div class="card sec">
+    <div class="sec-h"><h2>Рецепты с навеской</h2><span class="lbl">${PLAN.recipes.length} заготовок</span></div>
+    <p class="lead" style="margin-bottom:14px">Основное мясо — курица; говядина и индейка появляются по одному разу за неделю, рыба только белая. КБЖУ посчитано из навески и выхода — именно эти цифры стоят в порциях меню.</p>
+    <div class="grid" style="gap:9px">${PLAN.recipes.map((r,i)=>{
+      const p = r.pw>0;
+      return `<details class="rec"${i===0?' open':''}>
+        <summary class="rec-h">
+          ${donut(r.per100.p,r.per100.f,r.per100.c,44,7)}
+          <span><h4>${esc(r.title)}</h4><span class="g">${esc(r.gear)}</span></span>
+          <span class="mm mm-p">${r.per100.k} ккал/100 г</span>
+          ${svg('chev','chev')}
+        </summary>
+        <div class="rec-b">
+          <div><h5>Навеска</h5><ul class="ing">${r.ing.map(x=>
+            `<li>${esc(x.n)}<span>${esc(x.txt)}</span></li>`).join('')}</ul></div>
+          <div><h5>Порядок</h5><ol class="steps">${r.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol></div>
+        </div>
+        <div class="rec-f">
+          <span class="fx">На 100 г<b>${r.per100.k} ккал · Б ${String(r.per100.p).replace('.',',')} · Ж ${String(r.per100.f).replace('.',',')} · У ${String(r.per100.c).replace('.',',')}</b></span>
+          ${p?`<span class="fx">Её порция ${r.pw} г<b>${r.vw.k} ккал · Б ${r.vw.p}</b></span>
+              <span class="fx">Его порция ${r.pm} г<b>${r.vm.k} ккал · Б ${r.vm.p}</b></span>`:''}
+          <span class="hint">${esc(r.hint)}</span>
+        </div>
+      </details>`;
+    }).join('')}</div>
+  </div>`;
+}
+
+function smallCard(x,tagCls,tagName){
+  return `<div class="item">
+    <div class="meal-h"><h4>${esc(x.title)}</h4><span class="tag ${tagCls}">${tagName}</span></div>
+    <p class="q">${esc(x.qty)}</p>
+    <p class="n">${esc(x.note)}</p>
+    <div class="meal-r" style="justify-content:space-between">
+      <span class="macro-mini"><span class="mm mm-p">Б ${x.p}</span><span class="mm mm-f">Ж ${x.f}</span><span class="mm mm-c">У ${x.c}</span></span>
+      <span class="kcal-b"><b>${x.k}</b><span>ккал</span></span>
+    </div>
+  </div>`;
+}
+function pageSnacks(){
+  return `
+  <div class="card sec">
+    <div class="sec-h"><h2>Перекусы на замену</h2><span class="lbl">${PLAN.snacks.length} вариантов</span></div>
+    <p class="lead" style="margin-bottom:14px">Любой перекус в меню меняется на любой отсюда с похожей калорийностью. Порции женские; ему — на четверть больше либо плюс половина белкового блока.</p>
+    <div class="grid g2">${PLAN.snacks.map(x=>smallCard(x,'tg-sn','Перекус')).join('')}</div>
+  </div>
+  <div class="card sec">
+    <div class="sec-h"><h2>Сладкое: слот до 100 ккал</h2><span class="lbl">один пункт в день, обоим</span></div>
+    <p class="lead" style="margin-bottom:14px">Это не награда и не исключение, а заложенная строка бюджета — без неё планы на дефиците ломаются недели через три.</p>
+    <div class="grid g3">${PLAN.sweets.map(x=>smallCard(x,'tg-sw','Сладкое')).join('')}</div>
+  </div>`;
+}
+
+function pageCook(){
+  return `<div class="card sec">
+    <div class="sec-h"><h2>График готовки</h2><span class="lbl">активное время у плиты</span></div>
+    <p class="lead" style="margin-bottom:14px">Мультиварка, духовка и хлебопечка работают без вас, поэтому воскресные три с половиной часа — это фон, а не вахта.</p>
+    <div class="cook-l">${COOK.map(([d,s,t,key,txt])=>
+      `<div class="cook-i${key?' key':''}"><span class="dd">${d}<small>${s}</small></span>
+       <p>${txt}<br><span class="num" style="font-size:11px;color:var(--ink3)">${t} активных</span></p></div>`).join('')}</div>
+  </div>`;
+}
+
+function pageShop(){
+  return `<div class="grid g2" style="gap:14px">${SHOP.map(([t,w,groups],ci)=>`
+    <div class="card sec">
+      <div class="sec-h"><h2>${t}</h2></div>
+      <p class="lead" style="font-size:12.5px">${w}</p>
+      <div class="shopg">${groups.map(([g,items])=>
+        `<span class="lbl">${g}</span>` + items.map(([n,a])=>{
+          const id=`s${ci}_${g}_${n}`.replace(/[^\wа-яА-Я]/g,'');
+          return `<label><input type="checkbox" data-k="${id}"${checked[id]?' checked':''}><span>${esc(n)}</span><span class="amt">${esc(a)}</span></label>`;
+        }).join('')).join('')}</div>
+    </div>`).join('')}</div>`;
+}
+
+function pageNotes(){
+  return `<div class="card sec">
+    <div class="sec-h"><h2>Что подкрутить и на что смотреть</h2></div>
+    <div class="callout"><b>Дефицит опущен, но не одинаково.</b> Правильный ход был не «резать сильнее», а честнее оценить поддержку: коэффициент активности снижен с 1,45 до 1,375, обе поддержки упали примерно на 110 ккал. Дальше пути расходятся — 23% против 12%, в зависимости от того, есть ли запас жировой массы. Любой расчёт поддержки это гипотеза с разбросом ±15%, поэтому через две-три недели цифры правятся по весам, а не по формуле.</div>
+    <div class="notes">${NOTES.map(([t,p])=>`<div class="note-c"><h4>${t}</h4><p>${p}</p></div>`).join('')}</div>
+  </div>`;
+}
+
+function rail(){
+  const d=PLAN.days[day];
+  const top=[...PLAN.snacks].sort((a,b)=>density(b.p,b.k)-density(a.p,a.k)).slice(0,4);
+  return `
+  <div class="card sec">
+    <div class="sec-h"><h2>Сегодня в плане</h2><span class="lbl">${esc(d.name)}</span></div>
+    <div class="mini">${d.meals.slice(0,4).map(m=>{
+      const v=m[who];
+      return `<div class="mini-row">${donut(v.p,v.f,v.c,34,6)}
+        <span><h5>${esc(m.title)}</h5><span class="s">${TAGN[m.label]||m.label}</span></span>
+        <span class="kk">${nf(v.k)}</span></div>`;
+    }).join('')}</div>
+  </div>
+  <div class="card sec">
+    <div class="sec-h"><h2>Самые белковые перекусы</h2></div>
+    <div class="mini">${top.map(x=>
+      `<div class="mini-row">${donut(x.p,x.f,x.c,34,6)}
+        <span><h5>${esc(x.title)}</h5><span class="s">${density(x.p,x.k).toFixed(1)} г белка на 100 ккал</span></span>
+        <span class="kk">${x.k}</span></div>`).join('')}</div>
+  </div>
+  <div class="card sec">
+    <div class="sec-h"><h2>Ближайшая закладка</h2></div>
+    <div class="cook-l">${COOK.slice(0,3).map(([dd,s,t,key,txt])=>
+      `<div class="cook-i"><span class="dd">${dd}<small>${s}</small></span><p>${txt}</p></div>`).join('')}</div>
+  </div>`;
+}
+
+const RENDER = {home:pageHome, week:pageWeek, recipes:pageRecipes, snacks:pageSnacks, cook:pageCook, shop:pageShop, notes:pageNotes};
+
+function render(){
+  renderNav(); renderWho();
+  const title = PAGES.find(p=>p[0]===page)[1];
+  document.getElementById('pgTitle').textContent = title;
+  document.getElementById('pgSub').textContent = SUBS[page];
+  const P=PLAN.people[who];
+  document.getElementById('pgBadge').textContent = `${P.name} · ${nf(P.kcal)} ккал/день`;
+  document.getElementById('pages').innerHTML = `<div class="main" style="gap:14px">${RENDER[page]()}</div>`;
+  document.getElementById('rail').innerHTML = rail();
+}
+
+document.addEventListener('click', e=>{
+  const nb = e.target.closest('#nav button');
+  if(nb){ page = nb.dataset.page; render(); window.scrollTo({top:0,behavior:'smooth'}); return; }
+  const sb = e.target.closest('#seg button');
+  if(sb){ who = sb.dataset.who; store.set('kotel.who',who); render(); return; }
+  const db = e.target.closest('[data-day]');
+  if(db){ day = +db.dataset.day; if(page!=='week'){ page='week'; } render(); return; }
+});
+document.addEventListener('change', e=>{
+  const cb = e.target.closest('.shopg input');
+  if(cb){ checked[cb.dataset.k] = cb.checked; store.set('kotel.shop',checked); }
+});
+render();
+</script>
