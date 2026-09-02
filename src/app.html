@@ -586,6 +586,7 @@ const ICON = {
   sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon:'<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/>',
   auto:'<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor" stroke="none"/>',
+  cup:'<path d="M4 8h12v7a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M16 10h2.5a2.5 2.5 0 0 1 0 5H16"/><path d="M7 2.5c0 1.2 1.2 1.2 1.2 2.4M11 2.5c0 1.2 1.2 1.2 1.2 2.4"/>',
   gear:'<circle cx="12" cy="12" r="3.2"/><path d="M19.4 14.5a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5v.2a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3h.1a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8v.1a1.6 1.6 0 0 0 1.5 1h.2a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>',
   swap:'<path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/>',
   pan:'<path d="M3 11h13a5 5 0 0 1 0 10H8a5 5 0 0 1-5-5z"/><path d="M16 13h3.5a2 2 0 0 0 0-4H18"/><path d="M7 7.5c0-1.5 1.5-1.5 1.5-3M11 7.5c0-1.5 1.5-1.5 1.5-3"/>',
@@ -795,12 +796,39 @@ function scaleQty(text, f){
 }
 const targetFor = (k, dayId) => Math.round(PLAN.targets[k][dayId] * scaleOf(k) / 5) * 5;
 
+/* ================= напитки =================
+   Кофе с молоком дважды в день — это 60–150 ккал, и на дефиците они
+   решают. Держим их отдельной строкой бюджета: еда ужимается ровно
+   на столько, сколько выпито, а день по-прежнему сходится в норму. */
+function drinkTotals(k){
+  const d = (profiles[k] || {}).drinks;
+  if(!d || !(d.cups > 0)) return { k:0, p:0, f:0, c:0, cups:0, per:null };
+  const f = FOOD[d.milk] || FOOD['молоко 2,5%'];
+  const ml = d.ml || 0, sug = d.sugar || 0;
+  const per = {
+    k: (f ? f.k * ml / 100 : 0) + sug * 4 + 2,      // 2 ккал — сам кофе или чай
+    p: (f ? f.p * ml / 100 : 0),
+    f: (f ? f.f * ml / 100 : 0),
+    c: (f ? f.c * ml / 100 : 0) + sug
+  };
+  return { k:per.k * d.cups, p:per.p * d.cups, f:per.f * d.cups, c:per.c * d.cups,
+           cups:d.cups, ml, sug, milk:(f ? f.n : null), per };
+}
+/* сколько калорий остаётся собственно на еду */
+const foodKcal = k => Math.max(person(k).kcal * 0.5, person(k).kcal - drinkTotals(k).k);
+/* во сколько раз ужимаются навески: и личная норма, и выпитое */
+function mealFactor(k, dayId){
+  const base = PLAN.targets[k][dayId];
+  const drink = drinkTotals(k).k * (targetFor(k, dayId) / person(k).kcal);
+  return Math.max(0.5, (targetFor(k, dayId) - drink) / base);
+}
+
 /* доля приёма в дневной норме */
 const SHARE = { 'Завтрак':0.24, 'Обед':0.31, 'Ужин':0.26, 'Перекус':0.10 };
 
 function aimFor(meal){
   const P = person(who), sh = SHARE[meal] || 0.25;
-  return { k: Math.round(P.kcal * sh / 5) * 5,
+  return { k: Math.round(foodKcal(who) * sh / 5) * 5,
            p: Math.round(P.prot * (meal === 'Перекус' ? sh * 1.35 : sh)) };
 }
 function sumOf(list){
@@ -1633,7 +1661,7 @@ function mealView(di, mi){
   const m = PLAN.days[di].meals[mi];
   const sw = swaps[swapKey(di, mi)];
   if(!sw || !sw.items || !sw.items.length){
-    const f = scaleOf(who), v = m[who];
+    const f = mealFactor(who, PLAN.days[di].id), v = m[who];
     if(Math.abs(f - 1) < 0.005)
       return { title:m.title, note:m.note, label:m.label, qty:v.qty, v, swapped:false };
     return { title:m.title, note:m.note, label:m.label, swapped:false, scaled:true,
@@ -1648,10 +1676,11 @@ function mealView(di, mi){
   };
 }
 function dayTotals(di){
+  const dr = drinkTotals(who);
   return PLAN.days[di].meals.reduce((a, _, mi) => {
     const v = mealView(di, mi).v;
     a.k += v.k; a.p += v.p; a.f += v.f; a.c += v.c; return a;
-  }, {k:0, p:0, f:0, c:0});
+  }, { k:Math.round(dr.k), p:Math.round(dr.p), f:Math.round(dr.f), c:Math.round(dr.c) });
 }
 
 /* варианты замены под КБЖУ именно этого приёма */
@@ -1861,6 +1890,18 @@ function pageCons(){
 /* Свой продукт: валидируем то, что реально ломает расчёт, а спорное
    показываем предупреждением и всё равно сохраняем — на упаковках
    сумма макросов часто не сходится с калорийностью. */
+function saveDrinks(){
+  const val = id => (document.getElementById(id) || {}).value || '';
+  const num = id => { const v = parseFloat(String(val(id)).replace(',', '.')); return isNaN(v) ? 0 : v; };
+  const pr = Object.assign({}, profiles[who] || {});
+  const cups = Math.round(num('dr_cups'));
+  if(cups <= 0){ delete pr.drinks; }
+  else pr.drinks = { cups, ml: Math.round(num('dr_ml')), sugar: Math.round(num('dr_sugar')), milk: val('dr_milk') || 'молоко 2,5%' };
+  profiles[who] = pr;
+  store.set('kotel.profiles', profiles);
+  render();
+}
+
 function saveProfile(){
   const val = id => (document.getElementById(id) || {}).value || '';
   const num = id => { const v = parseFloat(String(val(id)).replace(',', '.')); return isNaN(v) ? 0 : v; };
@@ -1988,6 +2029,65 @@ function pageProfile(){
   </div>` : ''}`;
 }
 
+function pageDrinks(){
+  const p = profiles[who] || {}, d = p.drinks || {};
+  const dr = drinkTotals(who);
+  const P = person(who);
+  const milks = allFoods().filter(f => /молоко|кефир|сливки/.test(f.n));
+  const milkOpts = milks.map(f =>
+    `<option value="${esc(f.n)}"${(d.milk || 'молоко 2,5%') === f.n ? ' selected' : ''}>${esc(f.n)} — ${Math.round(f.k)} ккал/100 мл</option>`).join('');
+
+  const share = dr.k ? Math.round(dr.k / P.kcal * 100) : 0;
+  const verdict = !dr.cups
+    ? 'Пока напитки не учтены. Если пьёте кофе или чай с молоком — впишите, сколько чашек, и бюджет еды уменьшится ровно на выпитое.'
+    : `${nf(dr.k)} ккал в день — это ${share}% нормы${share >= 8 ? ', то есть заметная часть приёма пищи' : ''}. На эти калории уже уменьшены навески во всех приёмах, день по-прежнему сходится в норму.`;
+
+  return `
+  <div class="card sec">
+    <div class="sec-h"><h2>Что я пью каждый день</h2><span class="lbl">только в этом браузере</span></div>
+    <p class="lead" style="margin-bottom:14px">Вода, чёрный кофе и чай без сахара считать не нужно. А вот молоко в кофе — нужно: две чашки по 50 мл это около 60 ккал, а если латте — уже за 200. На дефиците это разница между «сходится» и «непонятно, почему стоит вес».</p>
+    <div class="prm">
+      <div><label>Чашек в день</label><input id="dr_cups" type="number" min="0" max="12" step="1" value="${d.cups === undefined ? '' : d.cups}" placeholder="2"></div>
+      <div><label>Молока на чашку, мл</label><input id="dr_ml" type="number" min="0" max="400" step="5" value="${d.ml === undefined ? '' : d.ml}" placeholder="50"></div>
+      <div class="wide"><label>Чем добавляете</label><select id="dr_milk">${milkOpts}</select></div>
+      <div><label>Сахара на чашку, г</label><input id="dr_sugar" type="number" min="0" max="30" step="1" value="${d.sugar === undefined ? '' : d.sugar}" placeholder="0"></div>
+      <div style="display:flex;align-items:flex-end"><button type="button" class="btn" id="dr_save" style="width:100%;justify-content:center">Учесть в норме</button></div>
+      ${dr.cups ? '<div class="wide"><button type="button" class="btn btn-2" id="dr_clear">Не учитывать напитки</button></div>' : ''}
+    </div>
+    ${dr.cups ? `<div class="norm-out" style="margin-top:14px">
+      <div><span class="lbl">Одна чашка</span><b>${Math.round(dr.per.k)}</b> <s>ккал</s></div>
+      <div><span class="lbl">За день</span><b>${nf(dr.k)}</b> <s>ккал</s></div>
+      <div><span class="lbl">Белок</span><b>${Math.round(dr.p)}</b> <s>г</s></div>
+      <div><span class="lbl">Жиры</span><b>${Math.round(dr.f)}</b> <s>г</s></div>
+      <div><span class="lbl">Углеводы</span><b>${Math.round(dr.c)}</b> <s>г</s></div>
+      <div><span class="lbl">Осталось на еду</span><b>${nf(foodKcal(who))}</b> <s>ккал</s></div>
+    </div>` : ''}
+    <p class="verdict ${!dr.cups ? 'v-warn' : share >= 12 ? 'v-warn' : 'v-ok'}" style="margin-top:12px">${verdict}</p>
+  </div>
+  <div class="card sec">
+    <div class="sec-h"><h2>Сколько в чём</h2><span class="lbl">${PLAN.drinks.length} напитков</span></div>
+    <p class="lead" style="margin-bottom:14px">Порции типовые, КБЖУ посчитано из той же базы продуктов, что и всё меню.</p>
+    <div class="grid g2">${PLAN.drinks.map(x => `<div class="item">
+      <div class="meal-h"><h4>${esc(x.title)}</h4>${x.k <= 5 ? '<span class="tag tg-lu">не считается</span>' : x.k >= 100 ? '<span class="tag tg-di">как еда</span>' : '<span class="tag tg-sn">напиток</span>'}</div>
+      ${x.qty ? `<p class="q">${esc(x.qty)}</p>` : '<p class="q">без добавок</p>'}
+      <p class="n">${esc(x.note)}</p>
+      <div class="meal-r" style="justify-content:space-between">
+        <span class="macro-mini"><span class="mm mm-p">Б ${x.p}</span><span class="mm mm-f">Ж ${x.f}</span><span class="mm mm-c">У ${x.c}</span></span>
+        <span class="kcal-b"><b>${x.k}</b><span>ккал</span></span>
+      </div>
+    </div>`).join('')}</div>
+  </div>
+  <div class="card sec">
+    <div class="sec-h"><h2>Что стоит знать</h2></div>
+    <div class="notes">
+      <div class="note-c"><h4>Вода не считается вообще</h4><p>2–2,5 л ему, 1,8–2 л ей. На дефиците жажду легко принять за голод: если потянуло к холодильнику через час после еды, сначала выпейте стакан воды и подождите десять минут.</p></div>
+      <div class="note-c"><h4>Кофе сам по себе — ноль</h4><p>Чёрный кофе и чай без сахара можно не вносить: там около 2 ккал. Считать нужно то, что вы в них добавляете.</p></div>
+      <div class="note-c"><h4>Сливки коварнее молока</h4><p>Их наливают меньше по объёму, но 30 мл сливок весят как 90 мл молока. Если привыкли к сливкам — просто впишите их в поле выше, расчёт учтёт.</p></div>
+      <div class="note-c"><h4>Кефир и молоко — это еда</h4><p>Стакан кефира это 100 ккал и 8 г белка. Такое лучше проводить перекусом, а не напитком: тогда оно попадёт в приём и не собьёт бюджет.</p></div>
+    </div>
+  </div>`;
+}
+
 function pageSearch(){
   const R = searchAll(query);
   if(!R) return `<div class="card sec"><p class="empty"><b>Введите хотя бы две буквы</b>Поиск идёт по блюдам недели, навескам, рецептам, перекусам и списку покупок.</p></div>`;
@@ -2032,6 +2132,7 @@ const PAGES = [
   ['cons','Конструктор','plus'],
   ['recipes','Рецепты','book'],
   ['snacks','Перекусы','snack'],
+  ['drinks','Напитки','cup'],
   ['cook','Готовка','pot'],
   ['shop','Покупки','cart'],
   ['profile','Параметры','gear'],
@@ -2043,6 +2144,7 @@ const SUBS = {
   cons:'Соберите приём из того, что есть дома, или подправьте готовый под норму',
   recipes:'Все блюда конструктора и заготовки, которые готовятся впрок',
   snacks:'Взаимозаменяемые перекусы и ежедневный слот сладкого',
+  drinks:'Кофе с молоком тоже считается — здесь он попадает в бюджет дня',
   cook:'Одна большая закладка и короткие вечерние — что и когда',
   shop:'Разделено по логике доступа: скоропорт рядом с домом, длинное хранение по случаю',
   profile:'Нормы пересчитываются от текущего веса — параметры хранятся только в этом браузере',
@@ -2053,7 +2155,7 @@ const SUBS = {
 function renderNav(){
   document.getElementById('nav').innerHTML = PAGES.map(([id,t,ic])=>{
     const c = id==='week' ? PLAN.days.length : id==='cons' ? allFoods().length : id==='recipes' ? DISHES.length + PLAN.recipes.length
-            : id==='snacks' ? PLAN.snacks.length+PLAN.sweets.length : '';
+            : id==='snacks' ? PLAN.snacks.length+PLAN.sweets.length : id==='drinks' ? PLAN.drinks.length : '';
     return `<button type="button" data-page="${id}" aria-current="${id===page}">${svg(ic)}<span>${t}</span>${c?`<span class="count">${c}</span>`:''}</button>`;
   }).join('');
 }
@@ -2162,6 +2264,25 @@ function swapPanel(di, mi){
   </div></div>`;
   return out;
 }
+function drinkRow(){
+  const dr = drinkTotals(who);
+  if(!dr.cups) return '';
+  const cup = dr.cups === 1 ? 'чашка' : dr.cups < 5 ? 'чашки' : 'чашек';
+  return `<div class="meal">
+    ${donut(dr.p, dr.f, dr.c, 44, 7)}
+    <div>
+      <div class="meal-h"><h4>Кофе или чай с молоком</h4><span class="tag tg-sn">Напитки</span></div>
+      <p class="qty">${dr.cups} ${cup} в день${dr.ml ? ' · молока по ' + dr.ml + ' мл' : ''}${dr.sug ? ' · сахара по ' + dr.sug + ' г' : ''}</p>
+      <p class="note">Учтено отдельной строкой: на эти калории уменьшены навески во всех приёмах. Правится в разделе «Параметры».</p>
+    </div>
+    <div class="meal-r">
+      <span class="macro-mini">
+        <span class="mm mm-p">Б ${Math.round(dr.p)}</span><span class="mm mm-f">Ж ${Math.round(dr.f)}</span><span class="mm mm-c">У ${Math.round(dr.c)}</span>
+      </span>
+      <span class="kcal-b"><b>${nf(dr.k)}</b><span>ккал</span></span>
+    </div>
+  </div>`;
+}
 function mealRow(m, di, mi){
   const V = mealView(di, mi), v = V.v, cls = TAG[V.label] || 'tg-ghost', nm = TAGN[V.label] || V.label;
   const key = di + '.' + mi, open = openSwap === key;
@@ -2198,7 +2319,7 @@ function pageWeek(){
     </div>
     <div class="hero-body">
       <h3>${esc(d.name)}${day===TODAY?' <em style="color:var(--kcal)">сегодня</em>':''}</h3>
-      <p class="note">${esc(d.sub)} · ${d.meals.length} приёмов пищи · порция: ${person(who).name.toLowerCase()}</p>
+      <p class="note">${esc(d.sub)} · ${d.meals.length} приёмов пищи${drinkTotals(who).cups ? " + напитки" : ""} · порция: ${person(who).name.toLowerCase()}</p>
       <div class="hero-tags">
         <span class="tag ${d.gym?'tg-gym':'tg-ghost'}">${esc(d.badge)}</span>
         <span class="tag tg-ghost">${meter(v.p,v.k)}</span>
@@ -2209,7 +2330,7 @@ function pageWeek(){
   </div>
   <div class="card sec">
     <div class="sec-h"><h2>Приёмы пищи</h2><span class="lbl">навеска для: ${person(who).name.toLowerCase()}</span></div>
-    <div class="meals">${d.meals.map((m,mi) => mealRow(m, day, mi)).join('')}</div>
+    <div class="meals">${d.meals.map((m,mi) => mealRow(m, day, mi)).join('')}${drinkRow()}</div>
   </div>`;
 }
 
@@ -2365,7 +2486,7 @@ function rail(){
   </div>`;
 }
 
-const RENDER = {home:pageHome, week:pageWeek, cons:pageCons, profile:pageProfile, recipes:pageRecipes, snacks:pageSnacks, cook:pageCook, shop:pageShop, notes:pageNotes};
+const RENDER = {home:pageHome, week:pageWeek, cons:pageCons, profile:pageProfile, drinks:pageDrinks, recipes:pageRecipes, snacks:pageSnacks, cook:pageCook, shop:pageShop, notes:pageNotes};
 
 function render(){
   renderNav(); renderWho();
@@ -2401,6 +2522,11 @@ document.addEventListener('click', e=>{
       else item.g = Math.max(f.unit || 5, item.g - step);
     }
     render(); return;
+  }
+  if(e.target.closest('#dr_save')){ saveDrinks(); return; }
+  if(e.target.closest('#dr_clear')){
+    const pr = profiles[who] || {};
+    delete pr.drinks; profiles[who] = pr; store.set('kotel.profiles', profiles); render(); return;
   }
   if(e.target.closest('#pf_save')){ saveProfile(); return; }
   if(e.target.closest('#pf_reset')){ delete profiles[who]; store.set('kotel.profiles', profiles); render(); return; }

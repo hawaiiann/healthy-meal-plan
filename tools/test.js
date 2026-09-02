@@ -312,6 +312,53 @@ const probe = `
   if (Math.abs(dayTotals(0).k - dayBase) > 1) { pp++; console.log('  день не вернулся к базовым цифрам'); }
   profiles = {};
   console.log('проблем в личных нормах:', pp);
+  // напитки
+  let dk = 0;
+  profiles = {};
+  who = 'm';
+  if (drinkTotals('m').k !== 0) { dk++; console.log('  без настройки напитки не должны считаться'); }
+  const beforeDay = dayTotals(0).k, beforeTarget = targetFor('m', PLAN.days[0].id);
+  const beforeAim = aimFor('Обед').k;
+
+  profiles.m = { drinks: { cups: 2, ml: 50, sugar: 0, milk: 'молоко 2,5%' } };
+  const dr = drinkTotals('m');
+  const milk = FOOD['молоко 2,5%'];
+  const expect = ((milk.k * 50 / 100) + 2) * 2;
+  if (Math.abs(dr.k - expect) > 1) { dk++; console.log('  калорийность чашек посчитана неверно:', Math.round(dr.k), 'ожидалось', Math.round(expect)); }
+  if (dr.p <= 0) { dk++; console.log('  белок молока потерялся'); }
+  if (aimFor('Обед').k >= beforeAim) { dk++; console.log('  цель обеда должна уменьшиться на выпитое'); }
+
+  // день по-прежнему сходится в норму: еда ужалась ровно на напитки
+  const after = dayTotals(0);
+  if (Math.abs(after.k - beforeDay) > beforeTarget * 0.04) {
+    dk++; console.log('  день перестал сходиться:', Math.round(after.k), 'было', Math.round(beforeDay));
+  }
+  // навески действительно уменьшились
+  const q0 = PLAN.days[0].meals[2].m.qty, q1 = mealView(0, 2).qty;
+  if (q0 === q1) { dk++; console.log('  навеска приёма не уменьшилась под напитки'); }
+
+  // сахар считается
+  profiles.m = { drinks: { cups: 2, ml: 50, sugar: 10, milk: 'молоко 2,5%' } };
+  if (drinkTotals('m').k - dr.k < 70) { dk++; console.log('  сахар в чашке не учтён'); }
+
+  // строка напитков есть в дне, отрисовка цела
+  if (pageWeek().indexOf('Напитки') < 0) { dk++; console.log('  в дне нет строки напитков'); }
+  if (bad(pageWeek()).length) { dk++; console.log('  ПРОБЛЕМА отрисовки дня с напитками'); }
+  if (bad(pageDrinks()).length) { dk++; console.log('  ПРОБЛЕМА отрисовки раздела напитков'); }
+  if (!PLAN.drinks || PLAN.drinks.length < 10) { dk++; console.log('  каталог напитков пуст'); }
+  for (const x of (PLAN.drinks || [])) {
+    if (typeof x.k !== 'number' || x.k < 0 || x.k > 400) { dk++; console.log('  странная калорийность напитка:', x.title, x.k); }
+  }
+  // абсурдная настройка не должна съедать больше половины нормы
+  profiles.m = { drinks: { cups: 12, ml: 400, sugar: 30, milk: 'сливки 10%' } };
+  if (foodKcal('m') < person('m').kcal * 0.5 - 1) { dk++; console.log('  бюджет еды провалился ниже половины нормы'); }
+  if (mealFactor('m', PLAN.days[0].id) < 0.5) { dk++; console.log('  навески ужались сильнее чем вдвое'); }
+
+  profiles = {};
+  if (drinkTotals('m').k !== 0) { dk++; console.log('  сброс не убрал напитки'); }
+  if (Math.abs(dayTotals(0).k - beforeDay) > 1) { dk++; console.log('  день не вернулся после сброса напитков'); }
+  console.log('проблем в напитках:', dk);
+
   console.log('сегодня по календарю: индекс ' + TODAY + ' -> ' + PLAN.days[TODAY].name);
 })();
 `;
