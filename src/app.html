@@ -683,6 +683,8 @@ let day = (new Date().getDay() + 6) % 7;
 let checked = store.get('kotel.shop',{}) || {};
 let query = '';
 let openRec = 0;
+let recMeal = 'Все';
+let openDish = null;
 const TODAY = (new Date().getDay() + 6) % 7;   /* 0 = понедельник */
 let pantry = store.get('kotel.pantry', null);
 if(!pantry || typeof pantry !== 'object') pantry = {};
@@ -1488,6 +1490,26 @@ function fitKcal(list, target){
   }
 }
 
+/* Образец блюда для каталога рецептов. В отличие от сборки в конструкторе
+   берёт продукты из всей базы, а не из кладовки, и выбирает их без случайности —
+   чтобы список не перетасовывался при каждой перерисовке. */
+function previewDish(tpl){
+  const meal = tpl.meals[0], aim = aimFor(meal), parts = [];
+  for(const sl of tpl.slots){
+    let pool = allFoods();
+    if(sl.only) pool = pool.filter(f => sl.only.indexOf(f.n) >= 0);
+    if(sl.cat)  pool = pool.filter(f => f.cat === sl.cat);
+    if(sl.not)  pool = pool.filter(f => sl.not.indexOf(f.n) < 0);
+    if(!pool.length){ if(sl.req) return null; continue; }
+    const f = pool[0];
+    if(parts.some(x => x.n === f.n)) continue;
+    parts.push({ n:f.n, g:roundG(f, sl.base), r:sl.r, lo:sl.lo || 5, hi:sl.hi || 260, flex:!!sl.flex });
+  }
+  if(!tpl.slots.every(sl => !sl.req || parts.some(x => x.r === sl.r))) return null;
+  fitKcal(parts, aim.k);
+  return { parts, aim, meal, v: sumOf(parts) };
+}
+
 function assembleDish(meal, wantId, aimOverride){
   const aim = aimOverride || aimFor(meal);
   const cands = wantId ? DISHES.filter(t => t.id === wantId && dishFits(t)) : dishesFor(meal, aim.k);
@@ -2019,7 +2041,7 @@ const SUBS = {
   home:'Нормы, недельная раскладка и принцип, по которому одна готовка кормит двоих',
   week:'Семь дней, 42 приёма пищи. Каждая навеска посчитана из рецептов',
   cons:'Соберите приём из того, что есть дома, или подправьте готовый под норму',
-  recipes:'Двенадцать заготовок, из которых собрано всё меню',
+  recipes:'Все блюда конструктора и заготовки, которые готовятся впрок',
   snacks:'Взаимозаменяемые перекусы и ежедневный слот сладкого',
   cook:'Одна большая закладка и короткие вечерние — что и когда',
   shop:'Разделено по логике доступа: скоропорт рядом с домом, длинное хранение по случаю',
@@ -2030,7 +2052,7 @@ const SUBS = {
 /* ---------- рендер ---------- */
 function renderNav(){
   document.getElementById('nav').innerHTML = PAGES.map(([id,t,ic])=>{
-    const c = id==='week' ? PLAN.days.length : id==='cons' ? allFoods().length : id==='recipes' ? PLAN.recipes.length
+    const c = id==='week' ? PLAN.days.length : id==='cons' ? allFoods().length : id==='recipes' ? DISHES.length + PLAN.recipes.length
             : id==='snacks' ? PLAN.snacks.length+PLAN.sweets.length : '';
     return `<button type="button" data-page="${id}" aria-current="${id===page}">${svg(ic)}<span>${t}</span>${c?`<span class="count">${c}</span>`:''}</button>`;
   }).join('');
@@ -2192,27 +2214,67 @@ function pageWeek(){
 }
 
 function pageRecipes(){
-  return `<div class="card sec">
-    <div class="sec-h"><h2>Рецепты с навеской</h2><span class="lbl">${PLAN.recipes.length} заготовок</span></div>
-    <p class="lead" style="margin-bottom:14px">Основное мясо — курица; говядина и индейка появляются по одному разу за неделю, рыба только белая. КБЖУ посчитано из навески и выхода — именно эти цифры стоят в порциях меню.</p>
-    <div class="grid" style="gap:9px">${PLAN.recipes.map((r,i)=>{
-      const p = r.pw>0;
-      return `<details class="rec"${i===openRec?' open':''}>
+  const MEALS = ['Все', 'Завтрак', 'Обед', 'Ужин', 'Перекус'];
+  const list = DISHES.filter(t => recMeal === 'Все' || t.meals.indexOf(recMeal) >= 0);
+  const pills = MEALS.map(m =>
+    `<button type="button" data-recmeal="${m}" aria-pressed="${m === recMeal}">${m}<i>${
+      m === 'Все' ? DISHES.length : DISHES.filter(t => t.meals.indexOf(m) >= 0).length}</i></button>`).join('');
+
+  const dishCards = list.map((t, i) => {
+    const pv = previewDish(t);
+    if(!pv) return '';
+    const st = stepsFor(t, pv.parts);
+    const title = st && !st.broken ? cap(st.title) : t.short;
+    const open = openDish === t.id;
+    return `<details class="rec"${open ? ' open' : ''} data-recid="${t.id}">
+      <summary class="rec-h">
+        ${donut(pv.v.p, pv.v.f, pv.v.c, 44, 7)}
+        <span><h4>${esc(title)}</h4><span class="g">${esc(t.gear)} · ${esc(t.time)} · ${t.meals.join(', ').toLowerCase()}</span></span>
+        <span class="mm mm-p">${Math.round(pv.v.k)} ккал</span>
+        ${svg('chev', 'chev')}
+      </summary>
+      <div class="rec-b">
+        <div><h5>Навеска на порцию</h5><ul class="ing">${pv.parts.map(x =>
+          `<li>${esc(word(x.n))}<span>${gOf(x)}</span></li>`).join('')}</ul></div>
+        <div><h5>Порядок</h5><ol class="steps">${(st && !st.broken ? st.steps : []).map(x =>
+          `<li>${esc(x)}</li>`).join('')}</ol></div>
+      </div>
+      <div class="rec-f">
+        <span class="fx">Порция<b>${Math.round(pv.v.k)} ккал · Б ${Math.round(pv.v.p)} · Ж ${Math.round(pv.v.f)} · У ${Math.round(pv.v.c)}</b></span>
+        <span class="hint">Навеска показана под ${pv.meal.toLowerCase()} для: ${person(who).name.toLowerCase()}. В конструкторе она пересчитается под ваш приём и под то, что есть дома.</span>
+        <button type="button" class="btn btn-2" data-cook="${t.id}">Собрать это блюдо</button>
+      </div>
+    </details>`;
+  }).join('');
+
+  return `
+  <div class="card sec">
+    <div class="sec-h"><h2>Блюда</h2><span class="lbl">${DISHES.length} рецептов · навеска подстраивается</span></div>
+    <p class="lead" style="margin-bottom:12px">Каждое блюдо — не жёсткий рецепт, а схема: роли компонентов и порядок готовки. Продукты в ролях подставляются из того, что есть дома, а граммовка считается под норму приёма. Ниже показан образец навески.</p>
+    <div class="pillbar" style="padding:0 0 12px">${pills}</div>
+    <div class="grid" style="gap:9px">${dishCards}</div>
+  </div>
+  <div class="card sec">
+    <div class="sec-h"><h2>Заготовки на неделю</h2><span class="lbl">${PLAN.recipes.length} штук</span></div>
+    <p class="lead" style="margin-bottom:14px">Это то, что готовится впрок по графику и живёт по два дня. КБЖУ посчитано из навески и выхода — именно эти цифры стоят в порциях меню.</p>
+    <div class="grid" style="gap:9px">${PLAN.recipes.map((r, i) => {
+      const p = r.pw > 0;
+      return `<details class="rec"${i === openRec ? ' open' : ''}>
         <summary class="rec-h">
-          ${donut(r.per100.p,r.per100.f,r.per100.c,44,7)}
+          ${donut(r.per100.p, r.per100.f, r.per100.c, 44, 7)}
           <span><h4>${esc(r.title)}</h4><span class="g">${esc(r.gear)}</span></span>
           <span class="mm mm-p">${r.per100.k} ккал/100 г</span>
-          ${svg('chev','chev')}
+          ${svg('chev', 'chev')}
         </summary>
         <div class="rec-b">
-          <div><h5>Навеска</h5><ul class="ing">${r.ing.map(x=>
+          <div><h5>Навеска</h5><ul class="ing">${r.ing.map(x =>
             `<li>${esc(x.n)}<span>${esc(x.txt)}</span></li>`).join('')}</ul></div>
-          <div><h5>Порядок</h5><ol class="steps">${r.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol></div>
+          <div><h5>Порядок</h5><ol class="steps">${r.steps.map(x => `<li>${esc(x)}</li>`).join('')}</ol></div>
         </div>
         <div class="rec-f">
-          <span class="fx">На 100 г<b>${r.per100.k} ккал · Б ${String(r.per100.p).replace('.',',')} · Ж ${String(r.per100.f).replace('.',',')} · У ${String(r.per100.c).replace('.',',')}</b></span>
-          ${p?`<span class="fx">Её порция ${r.pw} г<b>${r.vw.k} ккал · Б ${r.vw.p}</b></span>
-              <span class="fx">Его порция ${r.pm} г<b>${r.vm.k} ккал · Б ${r.vm.p}</b></span>`:''}
+          <span class="fx">На 100 г<b>${r.per100.k} ккал · Б ${String(r.per100.p).replace('.', ',')} · Ж ${String(r.per100.f).replace('.', ',')} · У ${String(r.per100.c).replace('.', ',')}</b></span>
+          ${p ? `<span class="fx">Её порция ${r.pw} г<b>${r.vw.k} ккал · Б ${r.vw.p}</b></span>
+              <span class="fx">Его порция ${r.pm} г<b>${r.vm.k} ккал · Б ${r.vm.p}</b></span>` : ''}
           <span class="hint">${esc(r.hint)}</span>
         </div>
       </details>`;
@@ -2387,6 +2449,23 @@ document.addEventListener('click', e=>{
   if(tb){ theme = tb.dataset.themeSet; store.set('kotel.theme',theme); applyTheme(); return; }
   const gb = e.target.closest('[data-go]');
   if(gb){ page = gb.dataset.go; clearQuery(); render(); window.scrollTo({top:0,behavior:'smooth'}); return; }
+  const rmeal = e.target.closest('[data-recmeal]');
+  if(rmeal){ recMeal = rmeal.dataset.recmeal; render(); return; }
+  const ck = e.target.closest('[data-cook]');
+  if(ck){
+    const t = dishById(ck.dataset.cook);
+    if(t){
+      aimMeal = t.meals[0];
+      consNote = '';
+      const r = assembleDish(aimMeal, t.id);
+      built = r ? r.items : [];
+      builtTpl = r ? r.tpl : null;
+      if(!r) consNote = 'Для этого блюда не хватает продуктов в кладовке — отметьте недостающее справа.';
+      page = 'cons';
+      render(); window.scrollTo({top:0, behavior:'smooth'});
+    }
+    return;
+  }
   const rb = e.target.closest('[data-recipe]');
   if(rb){ openRec = +rb.dataset.recipe; page = 'recipes'; clearQuery(); render(); window.scrollTo({top:0,behavior:'smooth'}); return; }
   const db = e.target.closest('[data-day]');

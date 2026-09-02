@@ -237,6 +237,34 @@ const probe = `
   }
   console.log('проблем в заменах:', sw);
   console.log('блюд в библиотеке:', DISHES.length);
+  // каталог рецептов: каждое блюдо должно показываться, а не только собираться
+  let rc = 0;
+  const savedPantry2 = pantry;
+  pantry = {};                                   // каталог не должен зависеть от кладовки
+  for (const t2 of DISHES) {
+    const pv = previewDish(t2);
+    if (!pv) { rc++; console.log('  нет образца навески:', t2.id); continue; }
+    if (!pv.parts.length) { rc++; console.log('  пустая навеска:', t2.id); }
+    const st = stepsFor(t2, pv.parts);
+    if (!st || st.broken || !st.steps.length) { rc++; console.log('  нет шагов:', t2.id); }
+    else if (st.steps.some(x => bad(x).length)) { rc++; console.log('  мусор в шагах:', t2.id); }
+    if (!t2.short) { rc++; console.log('  нет короткого имени:', t2.id); }
+  }
+  pantry = savedPantry2;
+  for (const m of ['Все','Завтрак','Обед','Ужин','Перекус']) {
+    recMeal = m;
+    const html = pageRecipes();
+    if (bad(html).length) { rc++; console.log('  ПРОБЛЕМА отрисовки каталога:', m); }
+    const shown = (html.match(/data-recid=/g) || []).length;
+    const want = m === 'Все' ? DISHES.length : DISHES.filter(x => x.meals.indexOf(m) >= 0).length;
+    if (shown !== want) { rc++; console.log('  фильтр «' + m + '»: показано ' + shown + ' из ' + want); }
+  }
+  recMeal = 'Все';
+  const cat = pageRecipes();
+  if ((cat.match(/data-cook=/g) || []).length !== DISHES.length) { rc++; console.log('  не у всех блюд кнопка «Собрать»'); }
+  if (cat.indexOf('Заготовки на неделю') < 0) { rc++; console.log('  заготовки пропали из раздела'); }
+  console.log('проблем в каталоге рецептов:', rc);
+
   // личные нормы и пересчёт от веса
   let pp = 0;
   // формула Миффлина вручную: мужчина 31 год, 175 см, 90 кг
