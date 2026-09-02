@@ -577,5 +577,43 @@ $tpl  = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'app.html'))
 $dat  = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'data.js'))
 if(-not $tpl.Contains('/*__DATA__*/')){ throw 'в app.html нет плейсхолдера /*__DATA__*/' }
 $page = $tpl.Replace('/*__DATA__*/', $dat)
-[System.IO.File]::WriteAllText((Join-Path $root 'index.html'), $page, (New-Object System.Text.UTF8Encoding($false)))
-"index.html собран: $([math]::Round($page.Length/1024)) КБ"
+
+# фрагмент без <head> — для публикации артефактом, там обёртку добавляет хост
+[System.IO.File]::WriteAllText((Join-Path $cache 'artifact.html'), $page, (New-Object System.Text.UTF8Encoding($false)))
+
+# index.html для Pages — полноценный документ: без viewport телефон
+# рендерит страницу в десктопной ширине и показывает её уменьшенной
+$title = 'Один котёл, два половника'
+$m = [regex]::Match($page, '(?s)^\s*<title>(.*?)</title>\s*')
+if($m.Success){ $title = $m.Groups[1].Value; $page = $page.Substring($m.Length) }
+# <link> из начала фрагмента переносим в head, иначе шрифты грузятся из body
+$links = ''
+while($true){
+  $lm = [regex]::Match($page, '(?s)^\s*(<link\b[^>]*>)\s*')
+  if(-not $lm.Success){ break }
+  $links += $lm.Groups[1].Value + "`r`n"
+  $page = $page.Substring($lm.Length)
+}
+$icon = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🍲%3C/text%3E%3C/svg%3E"
+$head = @"
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Недельный план питания на двоих: КБЖУ считается из навесок, конструктор собирает блюдо из того, что есть дома.">
+<meta name="theme-color" content="#EEF4E1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12150D" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta property="og:title" content="$title">
+<meta property="og:description" content="Недельный план питания на двоих с конструктором блюд.">
+<meta property="og:type" content="website">
+<link rel="icon" href="$icon">
+<title>$title</title>
+$links</head>
+<body>
+"@
+$doc = $head + $page + "`r`n</body>`r`n</html>`r`n"
+[System.IO.File]::WriteAllText((Join-Path $root 'index.html'), $doc, (New-Object System.Text.UTF8Encoding($false)))
+"index.html собран: $([math]::Round($doc.Length/1024)) КБ (+ фрагмент для артефакта в src/.cache/)"

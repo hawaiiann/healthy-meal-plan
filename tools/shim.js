@@ -10,6 +10,8 @@ function makeEl(id) {
     textContent: '',
     value: '',
     hidden: false,
+    children: [],
+    classList: { add(){}, remove(){}, toggle(){} },
     dataset: {},
     attrs,
     setAttribute(k, v) { attrs[k] = String(v); },
