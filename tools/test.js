@@ -75,15 +75,15 @@ const probe = `
       aimMeal = meal;
       const aim = aimFor(meal);
       let miss = 0;
-      for (let t = 0; t < 25; t++) {              // сборка случайная — гоняем много раз
+      for (let t = 0; t < 60; t++) {              // сборка случайная — гоняем много раз
         const r = assemble(meal);
         if (!r) { cp++; console.log('  сборка вернула пусто', w, meal); break; }
         built = r;
         if (bad(pageCons()).length) { cp++; console.log('  ПРОБЛЕМА отрисовки', w, meal); break; }
         const s = sumOf(r);
-        if (Math.abs(s.k - aim.k) > aim.k * 0.18) miss++;
+        if (Math.abs(s.k - aim.k) > aim.k * 0.12) miss++;
       }
-      if (miss > 3) { cp++; console.log('  мимо цели ' + miss + '/25:', w, meal, 'цель', aim.k); }
+      if (miss > 2) { cp++; console.log("  мимо цели " + miss + "/60:", w, meal, "цель", aim.k); }
     }
   }
   built = [];
