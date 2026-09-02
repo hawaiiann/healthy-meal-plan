@@ -74,16 +74,25 @@ const probe = `
     for (const meal of ['Завтрак','Обед','Ужин','Перекус']) {
       aimMeal = meal;
       const aim = aimFor(meal);
-      let miss = 0;
-      for (let t = 0; t < 60; t++) {              // сборка случайная — гоняем много раз
-        const r = assemble(meal);
+      let miss = 0, noSteps = 0, overP = 0;
+      const seen = new Set();
+      for (let t = 0; t < 80; t++) {              // сборка случайная — гоняем много раз
+        const r = assembleDish(meal);
         if (!r) { cp++; console.log('  сборка вернула пусто', w, meal); break; }
-        built = r;
-        if (bad(pageCons()).length) { cp++; console.log('  ПРОБЛЕМА отрисовки', w, meal); break; }
-        const s = sumOf(r);
+        built = r.items; builtTpl = r.tpl;
+        seen.add(r.tpl.id);
+        if (bad(pageCons()).length) { cp++; console.log('  ПРОБЛЕМА отрисовки', w, meal, r.tpl.id); break; }
+        const rec = dishSteps();
+        if (!rec || rec.broken || !rec.steps.length) { noSteps++; }
+        else if (rec.steps.some(x => bad(x).length || x.indexOf("{") >= 0 || x.indexOf("}") >= 0)) { noSteps++; }
+        const s = sumOf(r.items);
         if (Math.abs(s.k - aim.k) > aim.k * 0.12) miss++;
+        if (s.p > aim.p * 1.6) overP++;
       }
-      if (miss > 2) { cp++; console.log("  мимо цели " + miss + "/60:", w, meal, "цель", aim.k); }
+      if (miss > 3) { cp++; console.log('  мимо цели ' + miss + '/80:', w, meal, 'цель', aim.k); }
+      if (noSteps) { cp++; console.log('  рецепт не собрался ' + noSteps + '/80:', w, meal); }
+      if (overP) { cp++; console.log('  перебор белка в ' + overP + '/80:', w, meal, 'цель', aim.p); }
+      if (seen.size < 2 && meal !== 'Перекус') { cp++; console.log('  мало разнообразия блюд:', w, meal, [...seen].join(',')); }
     }
   }
   built = [];
@@ -138,7 +147,7 @@ const probe = `
   // пустая кладовка не должна ронять сборку
   const savedPantry = pantry;
   pantry = {};
-  if (assemble('Обед') !== null) { fp++; console.log('  пустая кладовка должна давать null, а не мусор'); }
+  if (assembleDish('Обед') !== null) { fp++; console.log('  пустая кладовка должна давать null, а не мусор'); }
   pantry = savedPantry;
 
   // удаление своего продукта

@@ -150,6 +150,27 @@ button{font:inherit; color:inherit; border:none; background:none; cursor:pointer
 .pline .rm svg{width:11px; height:11px}
 .mine{display:inline-block; width:5px; height:5px; border-radius:50%; background:var(--lime-d); flex:0 0 auto}
 
+/* ---------- блюдо ---------- */
+.dish-h{display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; padding:14px 15px;
+  background:var(--lime-soft); border:1px solid var(--lime); border-radius:var(--r2); margin-bottom:11px}
+.dish-h h3{font-size:17px; font-weight:800; line-height:1.25; flex:1 1 200px; min-width:0}
+.dish-h .meta{display:flex; gap:6px; flex-wrap:wrap}
+.side-h{display:flex; align-items:center; gap:8px; margin:13px 0 7px}
+.side-h span{font-family:Nunito,sans-serif; font-size:10px; font-weight:700; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--ink3)}
+.side-h i{flex:1 1 auto; height:1px; background:var(--line); display:block}
+.howto{margin-top:12px; padding:14px 15px; background:var(--soft); border:1px solid var(--line); border-radius:var(--r2)}
+.howto h4{font-size:13px; font-weight:800; margin-bottom:9px; display:flex; align-items:center; gap:7px}
+.howto h4 svg{width:15px; height:15px; color:var(--kcal)}
+.howto ol{margin:0; padding-left:19px; display:flex; flex-direction:column; gap:7px}
+.howto li{font-size:13px; color:var(--ink2); line-height:1.45}
+.howto li::marker{font-family:"JetBrains Mono",monospace; font-weight:700; color:var(--kcal)}
+.dish-pick{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:11px}
+.dish-pick button{padding:6px 11px; border-radius:99px; border:1px solid var(--line-c); background:var(--mint);
+  font-family:Nunito,sans-serif; font-weight:700; font-size:12px; color:var(--ink2)}
+.dish-pick button:hover{background:var(--lime); color:var(--on-lime); border-color:var(--lime)}
+.dish-pick button[aria-pressed="true"]{background:var(--lime); color:var(--on-lime); border-color:var(--lime)}
+
 /* ---------- конструктор ---------- */
 .cons{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,300px); gap:16px; align-items:start}
 .cons-tools{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px}
@@ -461,6 +482,7 @@ const ICON = {
   sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon:'<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/>',
   auto:'<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor" stroke="none"/>',
+  pan:'<path d="M3 11h13a5 5 0 0 1 0 10H8a5 5 0 0 1-5-5z"/><path d="M16 13h3.5a2 2 0 0 0 0-4H18"/><path d="M7 7.5c0-1.5 1.5-1.5 1.5-3M11 7.5c0-1.5 1.5-1.5 1.5-3"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
   x:'<path d="M6 6l12 12M18 6 6 18"/>'
 };
@@ -561,6 +583,7 @@ if(!pantry || typeof pantry !== 'object') pantry = {};
 /* новые продукты подхватываются в уже сохранённую кладовку по умолчанию продукта */
 PLAN.foods.forEach(f => { if(!(f.n in pantry)) pantry[f.n] = f.on; });
 let built = [];
+let builtTpl = null;
 let consNote = '';
 let aimMeal = 'Обед';
 let theme = ['auto','light','dark'].includes(store.get('kotel.theme','auto')) ? store.get('kotel.theme','auto') : 'auto';
@@ -636,64 +659,352 @@ function roundG(f, g){
 function have(cat){ return allFoods().filter(f => f.cat === cat && pantry[f.n]); }
 const pick = arr => arr.length ? arr[Math.floor(Math.random() * arr.length)] : null;
 
-/* Сборка приёма. Белок задаёт стартовую навеску, дальше калории
-   добираются гарниром, фруктом и, в последнюю очередь, самим белком.
-   Нижняя граница навески — не фиксированные 60 г, а порция продукта:
-   иначе плотные продукты вроде протеина сразу вылетают за норму. */
-function assemble(meal){
-  const aim = aimFor(meal);
-  const prots = have('Белок');
-  if(!prots.length) return null;
-  const ranked = prots.slice().sort((a,b) => b.p/Math.max(b.k,1) - a.p/Math.max(a.k,1));
-  const pr  = pick(ranked.slice(0, Math.min(6, ranked.length)));
-  /* в перекусе кладём либо фрукт, либо овощ — вдвоём они не влезают в 170 ккал */
-  const wantFruit = meal === 'Завтрак' || (meal === 'Перекус' && Math.random() < 0.6);
-  const veg = (meal !== 'Перекус' || !wantFruit) ? pick(have('Овощи')) : null;
-  const grn = meal === 'Перекус' ? null : pick(have('Гарниры'));
-  const fr  = wantFruit ? pick(have('Фрукты')) : null;
-  const oil = meal === 'Перекус' ? null : have('Жиры и добавки').find(f => f.n === 'масло раст.');
-  const milk = pr.n === 'протеин' ? have('Молочное').find(f => f.n.indexOf('молоко') === 0) : null;
+/* ================= блюда =================
+   Конструктор собирает не набор продуктов, а блюдо: шаблон задаёт роли
+   компонентов и порядок готовки, продукты в роли подставляются из кладовки,
+   навески подгоняются под норму приёма. Что не влезло в блюдо, но нужно
+   по калориям, идёт «вприкуску» отдельной строкой. */
 
-  const out = [];
-  const add = (f,g) => { if(f) out.push({ n:f.n, g:roundG(f,g) }); };
+/* Названия продуктов в базе короткие и служебные («рис гот.»), а в рецепте
+   нужны человеческие и в нужном падеже: [именительный, творительный]. */
+const WORD = {
+  'филе куриное':['куриное филе','куриным филе'], 'фарш куриный':['куриный фарш','куриным фаршем'],
+  'фарш индейки':['фарш индейки','фаршем индейки'], 'фарш говяжий':['говяжий фарш','говяжьим фаршем'],
+  'тунец с/с':['тунец в собственном соку','тунцом'], 'яйцо':['яйцо','яйцом'],
+  'минтай':['минтай','минтаем'], 'треска':['треска','треской'],
+  'творог 5%':['творог','творогом'], 'йогурт греческий':['греческий йогурт','греческим йогуртом'],
+  'сыр лёгкий':['лёгкий сыр','лёгким сыром'], 'творожный сыр':['творожный сыр','творожным сыром'],
+  'сметана 15%':['сметана','сметаной'], 'протеин':['протеин','протеином'],
+  'рис гот.':['отварной рис','отварным рисом'], 'гречка гот.':['отварная гречка','отварной гречкой'],
+  'булгур гот.':['отварной булгур','отварным булгуром'], 'перловка гот.':['отварная перловка','отварной перловкой'],
+  'картофель отв.':['отварной картофель','отварным картофелем'], 'нут отв.':['отварной нут','отварным нутом'],
+  'хлопья овсяные':['овсяные хлопья','овсяными хлопьями'], 'хлеб':['хлеб','хлебом'], 'хлебец':['хлебцы','хлебцами'],
+  'шампиньоны':['шампиньоны','шампиньонами'], 'горошек конс.':['консервированный горошек','зелёным горошком'],
+  'кукуруза конс.':['консервированная кукуруза','кукурузой'], 'капуста':['капуста','капустой'],
+  'капуста квашеная':['квашеная капуста','квашеной капустой'], 'морковь':['морковь','морковью'],
+  'лук':['лук','луком'], 'помидор':['помидоры','помидорами'], 'огурец':['огурцы','огурцами'],
+  'кабачок':['кабачок','кабачком'], 'брокколи':['брокколи','брокколи'], 'перец сладкий':['сладкий перец','сладким перцем'],
+  'банан':['банан','бананом'], 'яблоко':['яблоко','яблоком'], 'ягоды заморож.':['замороженные ягоды','замороженными ягодами'],
+  'клубника':['клубника','клубникой'], 'вишня':['вишня','вишней'], 'изюм':['изюм','изюмом'], 'финик':['финики','финиками'],
+  'масло раст.':['растительное масло','растительным маслом'], 'орех грецкий':['грецкие орехи','грецкими орехами'],
+  'семечки тыквенные':['тыквенные семечки','тыквенными семечками'], 'семечки подсолн.':['подсолнечные семечки','подсолнечными семечками'],
+  'кунжут':['кунжут','кунжутом'], 'чиа':['семена чиа','семенами чиа'], 'паста арахисовая':['арахисовая паста','арахисовой пастой'],
+  'какао':['какао','какао'], 'мёд':['мёд','мёдом'], 'молоко 2,5%':['молоко','молоком'], 'молоко 1,5%':['молоко','молоком'],
+  'кефир 1%':['кефир','кефиром'], 'шоколад 85%':['горький шоколад','горьким шоколадом'],
+  'шоколад 72%':['шоколад 72%','шоколадом 72%'], 'зефир':['зефир','зефиром'],
+  'пастила':['пастила','пастилой'], 'мармелад':['мармелад','мармеладом']
+};
+const word = (n, c) => (WORD[n] ? WORD[n][c || 0] : n);
+const cap = s => String(s).charAt(0).toUpperCase() + String(s).slice(1);
+const gOf = x => { const f = FOOD[x.n]; return f && f.unit ? Math.round(x.g / f.unit) + ' шт' : x.g + ' г'; };
+const q = x => x ? word(x.n) + ' ' + gOf(x) : '';
+const qi = x => x ? word(x.n, 1) + ' ' + gOf(x) : '';
+const MEAT = ['филе куриное','фарш куриный','фарш индейки','фарш говяжий'];
+const SIDE_OK = ['хлеб','хлебец','банан','яблоко','орех грецкий','семечки тыквенные','финик',
+                 'шоколад 85%','шоколад 72%','зефир','пастила','мармелад'];
 
-  let gp = pr.p > 0 ? aim.p * 0.8 / (pr.p / 100) : 100;
-  gp = Math.min(gp, aim.k * 0.65 / (pr.k / 100));       // не больше 65% калорий приёма
-  gp = Math.min(Math.max(gp, pr.unit || 20), 300);
-  add(pr, gp);
-  if(milk) add(milk, 150);
-  add(veg, meal === 'Перекус' ? 100 : 150);
-  if(oil) out.push({ n:oil.n, g:5 });
-  add(fr, meal === 'Перекус' ? 100 : 120);
-  if(grn) add(grn, 100);
+const DISHES = [
+  { id:'skillet', title:'{main} с овощами на сковороде', meals:['Обед','Ужин'], gear:'сковорода', time:'20 минут',
+    slots:[
+      {r:'main', only:MEAT, base:160, lo:80, hi:320, req:true, flex:true},
+      {r:'veg', cat:'Овощи', not:['капуста квашеная','горошек конс.','кукуруза конс.'], base:150, lo:80, hi:260, req:true, flex:true},
+      {r:'grn', cat:'Гарниры', not:['хлеб','хлебец','хлопья овсяные'], base:120, lo:40, hi:260, flex:true},
+      {r:'oil', only:['масло раст.'], base:5, lo:3, hi:10}
+    ],
+    steps:S=>[
+      S.oil ? `Разогреть сковороду с ${qi(S.oil)} — на посуде с покрытием этого достаточно.` : 'Разогреть сухую сковороду с покрытием.',
+      `${cap(q(S.main))} выложить одним слоем и три минуты не трогать: так схватится корочка и мясо не даст сок.`,
+      `Добавить: ${q(S.veg)}. Посолить, жарить 7–8 минут на среднем огне, помешивая.`,
+      S.grn ? `Гарнир: ${q(S.grn)} в готовом виде.` : 'Гарнира тут нет — порция целиком из мяса и овощей.'
+    ] },
 
-  /* Подгонка калорий. На каждом проходе перебираем все компоненты и делаем
-     один шаг — тот, что сильнее приближает к цели. Через «минимальный шаг»
-     подгонка застревала на штучных продуктах: яйцу нужно было полстолько,
-     а меньше одной штуки оно измениться не может. */
-  const adj = [grn, fr, milk, veg, pr].filter(Boolean);
-  const bounds = f => ({
-    lo: f.unit || (f === veg ? 30 : 20),
-    hi: f === pr ? 300 : (f === veg ? 250 : 260)
-  });
-  for(let pass = 0; pass < 8; pass++){
-    const cur = sumOf(out).k, diff = aim.k - cur;
-    if(Math.abs(diff) <= aim.k * 0.04) break;
+  { id:'stew', title:'{main} с грибами в мультиварке', meals:['Обед','Ужин'], gear:'мультиварка', time:'40 минут, из них 10 активных',
+    slots:[
+      {r:'main', only:MEAT, base:170, lo:80, hi:320, req:true, flex:true},
+      {r:'mush', only:['шампиньоны'], base:150, lo:80, hi:300, req:true, flex:true},
+      {r:'veg', only:['лук','морковь','помидор','кабачок','перец сладкий'], base:100, lo:50, hi:200, flex:true},
+      {r:'grn', cat:'Гарниры', not:['хлеб','хлебец','хлопья овсяные'], base:120, lo:40, hi:260, flex:true},
+      {r:'oil', only:['масло раст.'], base:5, lo:3, hi:10}
+    ],
+    steps:S=>[
+      `Режим «Жарка»${S.oil ? ' с ' + qi(S.oil) : ''}: ${q(S.veg || S.mush)} — 5 минут.`,
+      `Добавить: ${q(S.mush)}. Жарить, пока не уйдёт вся влага — иначе блюдо получится водянистым.`,
+      `Заложить: ${q(S.main)}. Посолить, поперчить, режим «Тушение» — 30 минут.`,
+      S.grn ? `Гарнир: ${q(S.grn)}.` : 'Есть как есть — мясо с грибами уже даёт полноценную порцию.'
+    ] },
+
+  { id:'omelet', title:'Омлет с {veg:1}', meals:['Завтрак','Ужин'], gear:'сковорода', time:'10 минут',
+    slots:[
+      {r:'main', only:['яйцо'], base:110, lo:55, hi:275, req:true, flex:true},
+      {r:'veg', only:['помидор','шампиньоны','кабачок','перец сладкий','брокколи','лук','капуста'], base:120, lo:60, hi:220, req:true, flex:true},
+      {r:'milk', only:['молоко 2,5%','молоко 1,5%'], base:50, lo:20, hi:120, flex:true},
+      {r:'cheese', only:['сыр лёгкий','творожный сыр'], base:25, lo:10, hi:60, flex:true},
+      {r:'oil', only:['масло раст.'], base:4, lo:3, hi:8}
+    ],
+    steps:S=>[
+      `${cap(q(S.veg))} нарезать и обжарить на ${S.oil ? gOf(S.oil) + ' масла' : 'сухой сковороде'} до испарения влаги — 4 минуты.`,
+      `Взбить ${q(S.main)}${S.milk ? ' с ' + qi(S.milk) : ''} и щепотку соли.`,
+      'Вылить на овощи, накрыть крышкой, огонь ниже среднего — 5 минут.',
+      S.cheese ? `За минуту до готовности посыпать: ${q(S.cheese)}.` : 'Готово, когда верх схватился и перестал блестеть.'
+    ] },
+
+  { id:'porridge', title:'Овсянка на молоке с {fruit:1}', meals:['Завтрак'], gear:'мультиварка или кастрюля', time:'15 минут',
+    slots:[
+      {r:'oat', only:['хлопья овсяные'], base:50, lo:25, hi:90, req:true, flex:true},
+      {r:'milk', only:['молоко 2,5%','молоко 1,5%'], base:150, lo:80, hi:300, req:true, flex:true},
+      {r:'fruit', cat:'Фрукты', base:100, lo:40, hi:200, req:true, flex:true},
+      {r:'prot', only:['протеин'], base:20, lo:10, hi:40, flex:true},
+      {r:'seed', only:['чиа','семечки тыквенные','кунжут','орех грецкий'], base:10, lo:5, hi:25, flex:true}
+    ],
+    steps:S=>[
+      `${cap(q(S.oat))} залить ${qi(S.milk)}, довести до кипения и варить 5 минут на слабом огне.`,
+      S.prot ? `Снять с огня и дать остыть до тёплого. ${cap(q(S.prot))} вмешать только теперь — в кипяток он свернётся хлопьями.` : 'Снять с огня, дать постоять под крышкой 3 минуты.',
+      `Сверху: ${q(S.fruit)}${S.seed ? ', ' + q(S.seed) : ''}. Корица по вкусу.`
+    ] },
+
+  { id:'bowl', title:'Боул с {main:1}', meals:['Обед','Ужин'], gear:'без техники', time:'10 минут',
+    slots:[
+      {r:'main', only:['тунец с/с','яйцо','филе куриное','нут отв.','творог 5%'], base:120, lo:60, hi:220, req:true, flex:true},
+      {r:'veg', only:['помидор','огурец','капуста','морковь','перец сладкий'], base:150, lo:80, hi:280, req:true, flex:true},
+      {r:'can', only:['горошек конс.','кукуруза конс.','нут отв.'], base:100, lo:40, hi:200, flex:true},
+      {r:'grn', only:['хлебец','хлеб','гречка гот.','рис гот.','булгур гот.','перловка гот.'], base:70, lo:50, hi:200, flex:true},
+      {r:'oil', only:['масло раст.'], base:6, lo:3, hi:12}
+    ],
+    steps:S=>[
+      `${cap(q(S.veg))} нарезать крупно — в боуле мелкая нарезка теряется.`,
+      `Выложить: ${q(S.main)}${S.can ? ', сверху ' + q(S.can) + ' (слить жидкость)' : ''}.`,
+      S.oil ? `Заправить ${qi(S.oil)}, посолить, лимон или горчица по вкусу.` : 'Заправить лимоном и горчицей — так выйдет совсем без масла.',
+      S.grn ? `Рядом: ${q(S.grn)}.` : 'Готово.'
+    ] },
+
+  { id:'soup', title:'Суп с {main:1}', meals:['Обед'], gear:'мультиварка', time:'40 минут, из них 10 активных',
+    slots:[
+      {r:'main', only:MEAT, base:140, lo:70, hi:280, req:true, flex:true},
+      {r:'pot', only:['картофель отв.','нут отв.','гречка гот.','рис гот.'], base:150, lo:60, hi:280, req:true, flex:true},
+      {r:'veg', only:['морковь','лук','шампиньоны','капуста','помидор'], base:120, lo:60, hi:220, req:true, flex:true},
+      {r:'oil', only:['масло раст.'], base:5, lo:3, hi:10}
+    ],
+    steps:S=>[
+      `Режим «Жарка»${S.oil ? ' с ' + qi(S.oil) : ''}: ${q(S.veg)} — 5 минут.`,
+      `Добавить: ${q(S.main)}. Обжарить до изменения цвета; фарш разбивать лопаткой, чтобы не собрался комками.`,
+      `Заложить: ${q(S.pot)}. Залить водой на два пальца выше продуктов, посолить, лавровый лист.`,
+      'Режим «Тушение» — 30 минут. Суп живёт трое суток и на вторые вкуснее.'
+    ] },
+
+  { id:'fishbake', title:'Минтай под овощами', meals:['Обед','Ужин'], gear:'духовка', time:'35 минут, из них 10 активных',
+    slots:[
+      {r:'main', only:['минтай','треска'], base:180, lo:90, hi:320, req:true, flex:true},
+      {r:'veg', only:['морковь','лук','помидор','шампиньоны','кабачок'], base:150, lo:80, hi:260, req:true, flex:true},
+      {r:'sauce', only:['сметана 15%','творожный сыр'], base:30, lo:10, hi:60, flex:true},
+      {r:'cheese', only:['сыр лёгкий'], base:25, lo:10, hi:50, flex:true},
+      {r:'grn', only:['картофель отв.','рис гот.','гречка гот.','булгур гот.'], base:150, lo:50, hi:280, flex:true}
+    ],
+    steps:S=>[
+      `${cap(q(S.main))} обсушить бумажным полотенцем, посолить, сбрызнуть лимоном и оставить на 10 минут — рыба водянистая, лишняя влага тут мешает.`,
+      `${cap(q(S.veg))} припустить 7 минут${S.sauce ? ' и смешать с ' + qi(S.sauce) : ''}.`,
+      `Рыбу в форму, сверху овощную шубу.${S.cheese ? ' ' + cap(q(S.cheese)) + ' — на последние 10 минут.' : ''} Духовка 190 °C, 25 минут.`,
+      S.grn ? `Гарнир: ${q(S.grn)}.` : 'Готово.'
+    ] },
+
+  { id:'waffles', title:'Протеиновые вафли', meals:['Завтрак'], gear:'мультипекарь', time:'20 минут',
+    slots:[
+      {r:'oat', only:['хлопья овсяные'], base:45, lo:25, hi:80, req:true, flex:true},
+      {r:'curd', only:['творог 5%'], base:90, lo:50, hi:180, req:true, flex:true},
+      {r:'egg', only:['яйцо'], base:55, lo:55, hi:165, req:true, flex:true},
+      {r:'prot', only:['протеин'], base:15, lo:10, hi:35, flex:true},
+      {r:'top', only:['йогурт греческий','ягоды заморож.','клубника','вишня','банан'], base:70, lo:30, hi:150, flex:true}
+    ],
+    steps:S=>[
+      `${cap(q(S.oat))} смолоть в муку блендером.`,
+      `Туда же: ${q(S.curd)}, ${q(S.egg)}${S.prot ? ', ' + q(S.prot) : ''}, щепотка соли и разрыхлитель. Пробить до однородности и дать постоять 10 минут — тесто загустеет.`,
+      'Панель для вафель прогреть и один раз смазать кистью. По 70 г теста, 4–5 минут до румяности.',
+      S.top ? `Сверху: ${q(S.top)}.` : 'Остужать на решётке, а не стопкой, иначе отсыреют.'
+    ] },
+
+  { id:'toast', title:'Тост с {main:1}', meals:['Завтрак','Перекус'], gear:'тостер', time:'5 минут',
+    slots:[
+      {r:'bread', only:['хлеб','хлебец'], base:50, lo:20, hi:150, req:true, flex:true},
+      {r:'main', only:['яйцо','творожный сыр','сыр лёгкий','тунец с/с','филе куриное','творог 5%'], base:60, lo:25, hi:110, req:true, flex:true},
+      {r:'veg', only:['помидор','огурец','перец сладкий'], base:60, lo:30, hi:150, flex:true},
+      {r:'seed', only:['кунжут','семечки подсолн.'], base:5, lo:3, hi:12}
+    ],
+    steps:S=>[
+      `${cap(q(S.bread))} подсушить в тостере до хруста.`,
+      S.main.n === 'яйцо' ? `${cap(q(S.main))} отварить всмятку или пожарить — желток должен остаться жидким.` : `Сверху: ${q(S.main)}.`,
+      S.veg ? `Добавить: ${q(S.veg)} кружками. Соль, перец.` : 'Соль, перец.',
+      S.seed ? `Присыпать: ${q(S.seed)}.` : 'Есть сразу, пока хрустит.'
+    ] },
+
+  { id:'chickpea', title:'Хрустящий нут', meals:['Перекус'], gear:'духовка', time:'25 минут',
+    slots:[
+      {r:'main', only:['нут отв.'], base:90, lo:40, hi:180, req:true, flex:true},
+      {r:'oil', only:['масло раст.'], base:4, lo:2, hi:8},
+      {r:'add', only:['семечки тыквенные','кунжут'], base:10, lo:5, hi:25, flex:true}
+    ],
+    steps:S=>[
+      `${cap(q(S.main))} обсушить полотенцем досуха — иначе не захрустит, а запечётся мягким.`,
+      `Перемешать ${S.oil ? 'с ' + qi(S.oil) + ', ' : 'с '}паприкой, солью и чесночным порошком.`,
+      'Противень, 200 °C, 20–25 минут, один раз встряхнуть.',
+      S.add ? `Под конец добавить: ${q(S.add)}.` : 'Остудить — хрустит только холодным.'
+    ] },
+
+  /* ---- десерты ---- */
+  { id:'curdcream', title:'Творожный крем с бананом', meals:['Завтрак','Перекус'], gear:'без техники', time:'5 минут',
+    slots:[
+      {r:'curd', only:['творог 5%'], base:120, lo:60, hi:220, req:true, flex:true},
+      {r:'yog', only:['йогурт греческий','сметана 15%'], base:60, lo:25, hi:120, req:true, flex:true},
+      {r:'fruit', only:['банан'], base:100, lo:40, hi:150, req:true, flex:true},
+      {r:'add', only:['какао','паста арахисовая','орех грецкий','чиа'], base:8, lo:4, hi:20, flex:true}
+    ],
+    steps:S=>[
+      `${cap(q(S.curd))} размять вилкой с ${qi(S.yog)} до гладкости. Блендер не нужен: вилкой крем выходит плотнее.`,
+      `${cap(q(S.fruit))} нарезать кружками, половину вмешать, вторую выложить сверху.`,
+      S.add ? `Добавить: ${q(S.add)}. Подсластитель по вкусу.` : 'Подсластитель по вкусу.',
+      'Дать постоять 10 минут в холодильнике — крем схватится.'
+    ] },
+
+  { id:'berrybowl', title:'Ягодный боул с шоколадом', meals:['Перекус'], gear:'микроволновка', time:'5 минут',
+    slots:[
+      {r:'curd', only:['творог 5%'], base:130, lo:70, hi:220, req:true, flex:true},
+      {r:'yog', only:['йогурт греческий','сметана 15%'], base:50, lo:20, hi:110, req:true, flex:true},
+      {r:'berry', only:['ягоды заморож.','вишня','клубника'], base:80, lo:40, hi:160, req:true, flex:true},
+      {r:'choc', only:['шоколад 72%','шоколад 85%'], base:20, lo:8, hi:30, flex:true}
+    ],
+    steps:S=>[
+      `${cap(q(S.berry))} прогреть в микроволновке 30 секунд — они дадут сок, и он заменит сироп.`,
+      `${cap(q(S.curd))} смешать с ${qi(S.yog)}, выложить в миску.`,
+      'Сверху ягоды вместе с соком.',
+      S.choc ? `${cap(q(S.choc))} натереть или наломать поверх.` : 'Готово.'
+    ] },
+
+  { id:'gelato', title:'Джелато в мороженице', meals:['Перекус'], gear:'мороженица', time:'15 минут + охлаждение базы',
+    slots:[
+      {r:'base', only:['йогурт греческий','кефир 1%','молоко 2,5%','молоко 1,5%'], base:180, lo:100, hi:300, req:true, flex:true},
+      {r:'curd', only:['творог 5%'], base:80, lo:40, hi:160, req:true, flex:true},
+      {r:'fruit', only:['банан','ягоды заморож.','клубника','вишня'], base:80, lo:30, hi:160, flex:true},
+      {r:'prot', only:['протеин'], base:15, lo:8, hi:30, flex:true}
+    ],
+    steps:S=>[
+      `Пробить блендером: ${q(S.base)}, ${q(S.curd)}${S.fruit ? ', ' + q(S.fruit) : ''}${S.prot ? ', ' + q(S.prot) : ''}, подсластитель.`,
+      'Базу охладить в холодильнике минимум час — тёплая смесь в мороженице не взобьётся.',
+      'Залить в автомат на 15 минут.',
+      'Есть сразу: без стабилизаторов домашнее джелато через час в морозилке становится камнем.'
+    ] },
+
+  { id:'shake', title:'Протеиновый шейк', meals:['Перекус'], gear:'блендер', time:'3 минуты',
+    slots:[
+      {r:'milk', only:['молоко 2,5%','молоко 1,5%','кефир 1%'], base:200, lo:100, hi:320, req:true, flex:true},
+      {r:'prot', only:['протеин'], base:25, lo:12, hi:40, req:true, flex:true},
+      {r:'fruit', only:['банан','ягоды заморож.','клубника','вишня'], base:80, lo:30, hi:160, flex:true},
+      {r:'add', only:['чиа','паста арахисовая','какао'], base:8, lo:4, hi:18, flex:true}
+    ],
+    steps:S=>[
+      `В блендер: ${q(S.milk)}, ${q(S.prot)}${S.fruit ? ', ' + q(S.fruit) : ''}${S.add ? ', ' + q(S.add) : ''}.`,
+      'Пробить 30 секунд.',
+      S.fruit && S.fruit.n === 'ягоды заморож.' ? 'Замороженные ягоды класть не размораживая — шейк выйдет холодным без льда.' : 'Пить сразу, иначе расслоится.'
+    ] },
+
+  { id:'curdbake', title:'Творожная запеканка', meals:['Завтрак'], gear:'духовка', time:'45 минут, из них 10 активных',
+    slots:[
+      {r:'curd', only:['творог 5%'], base:200, lo:120, hi:320, req:true, flex:true},
+      {r:'egg', only:['яйцо'], base:55, lo:55, hi:165, req:true, flex:true},
+      {r:'oat', only:['хлопья овсяные'], base:30, lo:15, hi:60, req:true, flex:true},
+      {r:'milk', only:['молоко 2,5%','молоко 1,5%'], base:50, lo:20, hi:120, flex:true},
+      {r:'fruit', only:['изюм','яблоко','банан','ягоды заморож.'], base:40, lo:15, hi:100, flex:true}
+    ],
+    steps:S=>[
+      `${cap(q(S.oat))} залить ${S.milk ? qi(S.milk) : 'парой ложек воды'} на 15 минут — это даёт плотность вместо резиновости.`,
+      `Смешать с ${qi(S.curd)}${S.fruit ? ', добавить: ' + q(S.fruit) : ''}. Яйца (${gOf(S.egg)}) разделить, желтки — в тесто.`,
+      'Белки взбить отдельно до мягких пиков и вмешать лопаткой сверху вниз.',
+      'Форма, 180 °C, 35 минут до сухой зубочистки. Резать полностью остывшей.'
+    ] }
+];
+
+function slotPool(sl){
+  let pool = allFoods().filter(f => pantry[f.n]);
+  if(sl.only) pool = pool.filter(f => sl.only.indexOf(f.n) >= 0);
+  if(sl.cat)  pool = pool.filter(f => f.cat === sl.cat);
+  if(sl.not)  pool = pool.filter(f => sl.not.indexOf(f.n) < 0);
+  return pool;
+}
+const dishFits = t => t.slots.every(sl => !sl.req || slotPool(sl).length > 0);
+function dishesFor(meal){ return DISHES.filter(t => t.meals.indexOf(meal) >= 0 && dishFits(t)); }
+
+/* Подгонка калорий: на каждом проходе делаем один шаг — тот, что сильнее
+   приближает к цели. Шаг «первый подходящий» застревал на штучных
+   продуктах, где яйцу нужно было полштуки. */
+function fitKcal(list, target){
+  for(let pass = 0; pass < 10; pass++){
+    const cur = sumOf(list).k, diff = target - cur;
+    if(Math.abs(diff) <= target * 0.04) break;
     let best = null;
-    for(const f of adj){
-      const it = out.find(x => x.n === f.n);
-      if(!it || f.k <= 0) continue;
-      const b = bounds(f);
-      const ng = roundG(f, Math.min(Math.max(it.g + diff / (f.k / 100), b.lo), b.hi));
+    for(const it of list){
+      if(!it.flex) continue;
+      const f = FOOD[it.n];
+      if(!f || f.k <= 0) continue;
+      const ng = roundG(f, Math.min(Math.max(it.g + diff / (f.k / 100), it.lo), it.hi));
       if(ng === it.g) continue;
-      const after = Math.abs(aim.k - (cur + f.k * (ng - it.g) / 100));
+      const after = Math.abs(target - (cur + f.k * (ng - it.g) / 100));
       if(after < Math.abs(diff) - 1 && (!best || after < best.d)) best = { it, ng, d: after };
     }
     if(!best) break;
     best.it.g = best.ng;
   }
-  return out;
 }
+
+function assembleDish(meal, wantId){
+  const cands = wantId ? DISHES.filter(t => t.id === wantId && dishFits(t)) : dishesFor(meal);
+  if(!cands.length) return null;
+  const t = pick(cands);
+  const aim = aimFor(meal);
+  const parts = [];
+  for(const sl of t.slots){
+    const pool = slotPool(sl);
+    if(!pool.length){ if(sl.req) return null; continue; }
+    const f = pick(pool);
+    if(parts.some(x => x.n === f.n)) continue;          // один продукт в двух ролях не нужен
+    parts.push({ n:f.n, g:roundG(f, sl.base), r:sl.r, lo:sl.lo || 5, hi:sl.hi || 260, flex:!!sl.flex });
+  }
+  if(!t.slots.every(sl => !sl.req || parts.some(x => x.r === sl.r))) return null;
+
+  /* главный компонент задаёт белок, остальное подгоняется по калориям */
+  const mainIt = parts.find(x => x.r === 'main' || x.r === 'curd' || x.r === 'prot');
+  if(mainIt){
+    const f = FOOD[mainIt.n];
+    if(f.p > 0){
+      const gp = Math.min(aim.p * 0.8 / (f.p / 100), aim.k * 0.65 / (f.k / 100));
+      mainIt.g = roundG(f, Math.min(Math.max(gp, mainIt.lo), mainIt.hi));
+      if(f.p >= 5) mainIt.hi = Math.max(mainIt.g, roundG(f, aim.p * 1.25 / (f.p / 100)));
+    }
+  }
+  fitKcal(parts, aim.k);
+
+  /* вприкуску: то, что не влезло в блюдо, но нужно по калориям */
+  const side = [];
+  const rest = aim.k - sumOf(parts).k;
+  if(rest >= 60){
+    const pool = allFoods().filter(f => pantry[f.n] && SIDE_OK.indexOf(f.n) >= 0 && !parts.some(x => x.n === f.n));
+    if(pool.length){
+      const f = pick(pool);
+      side.push({ n:f.n, g:roundG(f, Math.min(Math.max(rest / (f.k / 100), f.unit || 10), 130)),
+                  r:'side', lo:f.unit || 5, hi:150, flex:true, side:true });
+      fitKcal(parts.concat(side), aim.k);
+    }
+  }
+  return { tpl:t, items: parts.concat(side) };
+}
+
+/* шаги готовки по текущему составу — пересчитываются после ручных правок */
+function dishSteps(){
+  if(!builtTpl) return null;
+  const S = {};
+  for(const x of built) if(x.r && !x.side) S[x.r] = x;
+  const missing = builtTpl.slots.filter(sl => sl.req && !S[sl.r]);
+  if(missing.length) return { broken:true };
+  try { return { title: builtTpl.title.replace(/\{(\w+)(?::(\d))?\}/g, (_, r, c) => S[r] ? word(S[r].n, c ? +c : 0) : ''), steps: builtTpl.steps(S) }; }
+  catch(e){ return { broken:true }; }
+}
+
 function fromMeal(di, mi){
   const m = PLAN.days[di].meals[mi];
   const parts = m[who].qty.split(', ').map(t => {
@@ -714,7 +1025,7 @@ function pageCons(){
   const dk = tot.k - aim.k, dp = tot.p - aim.p;
   let verdict = '', vcls = 'v-ok';
   if(consNote){ vcls = 'v-warn'; verdict = consNote; }
-  else if(!built.length) verdict = 'Отметьте продукты слева и нажмите «Собрать». Можно и наоборот: взять готовый приём из меню и подправить навески.';
+  else if(!built.length) verdict = 'Нажмите «Собрать» — конструктор подберёт блюдо из отмеченных продуктов, посчитает навеску под норму и покажет порядок готовки. Можно выбрать блюдо самому кнопками выше или взять готовый приём из меню.';
   else if(Math.abs(dk) <= aim.k * 0.07 && dp >= -4) { verdict = `Попадание в цель: ${dk >= 0 ? '+' : ''}${Math.round(dk)} ккал, белок ${dp >= 0 ? '+' : ''}${Math.round(dp)} г. Так можно есть.`; }
   else if(Math.abs(dk) <= aim.k * 0.15) { vcls = 'v-warn'; verdict = `${dk > 0 ? 'Перебор' : 'Недобор'} ${Math.abs(Math.round(dk))} ккал${dp < -4 ? `, белка не хватает ${Math.abs(Math.round(dp))} г` : ''}. Поправьте граммовку кнопками.`; }
   else { vcls = 'v-bad'; verdict = `${dk > 0 ? 'Перебор' : 'Недобор'} ${Math.abs(Math.round(dk))} ккал — это заметно мимо нормы. Уберите или добавьте компонент.`; }
@@ -724,14 +1035,32 @@ function pageCons(){
   const planOpts = PLAN.days.map((d, di) => d.meals.map((m, mi) =>
     `<option value="${di}.${mi}">${esc(d.name)} · ${esc(m.title)}</option>`).join('')).join('');
 
-  const comps = built.length ? built.map((x, i) => {
+  const compRow = (x, i) => {
     const f = FOOD[x.n], v = { k: f.k*x.g/100, p: f.p*x.g/100, f: f.f*x.g/100, c: f.c*x.g/100 };
     return `<div class="comp">
       <span><h5>${esc(x.n)}</h5><span class="s">${f.unit ? x.g+' г · ' : ''}${Math.round(v.k)} ккал · Б ${v.p.toFixed(1)} · Ж ${v.f.toFixed(1)} · У ${v.c.toFixed(1)}</span></span>
       <span class="g"><button type="button" data-g="${i}:-">−</button><b>${f.unit ? Math.round(x.g/f.unit)+' шт' : x.g+' г'}</b><button type="button" data-g="${i}:+">+</button></span>
       <button type="button" class="del" data-g="${i}:x" aria-label="Убрать ${esc(x.n)}">${svg('x')}</button>
     </div>`;
-  }).join('') : `<p class="empty"><b>Пусто</b>Соберите приём из отмеченных продуктов или возьмите за основу готовый.</p>`;
+  };
+  const inDish = built.map((x,i) => [x,i]).filter(([x]) => !x.side);
+  const asSide = built.map((x,i) => [x,i]).filter(([x]) => x.side);
+  const recipe = dishSteps();
+
+  const comps = built.length ? (
+    (recipe && !recipe.broken ? `<div class="dish-h">
+        <h3>${esc(cap(recipe.title))}</h3>
+        <span class="meta"><span class="tag tg-lu">${esc(builtTpl.gear)}</span><span class="tag tg-ghost">${esc(builtTpl.time)}</span></span>
+      </div>` : '') +
+    `<div class="res-list">${inDish.map(([x,i]) => compRow(x,i)).join('')}</div>` +
+    (asSide.length ? `<div class="side-h"><span>Вприкуску</span><i></i></div>
+       <div class="res-list">${asSide.map(([x,i]) => compRow(x,i)).join('')}</div>` : '') +
+    (recipe ? (recipe.broken
+      ? `<div class="howto"><h4>${svg('pan')}Как приготовить</h4><p style="font-size:13px;color:var(--ink2)">Состав изменён так, что рецепт «${esc(builtTpl.title.replace(/\{[^}]+\}/g,'…'))}» больше не собирается — не хватает обязательного компонента. Нажмите «Собрать» заново или верните убранное.</p></div>`
+      : `<div class="howto"><h4>${svg('pan')}Как приготовить</h4><ol>${recipe.steps.map(t => `<li>${esc(t)}</li>`).join('')}</ol></div>`) : '')
+  ) : `<p class="empty"><b>Пусто</b>Отметьте продукты справа и нажмите «Собрать» — получите блюдо с навеской и порядком готовки.</p>`;
+
+  const menuDishes = dishesFor(aimMeal);
 
   const list = allFoods();
   const cats = [...new Set(list.map(f => f.cat))];
@@ -759,6 +1088,10 @@ function pageCons(){
       <select class="sel" id="baseSel" aria-label="Взять за основу приём из меню"><option value="">Взять за основу из меню…</option>${planOpts}</select>
       ${built.length ? '<button type="button" class="btn btn-2" id="doClear">Очистить</button>' : ''}
     </div>
+    ${menuDishes.length ? `<div class="dish-pick">
+      <span class="lbl" style="align-self:center;margin-right:2px">Или конкретное блюдо:</span>
+      ${menuDishes.map(t => `<button type="button" data-dish="${t.id}" aria-pressed="${builtTpl && builtTpl.id === t.id}">${esc(t.title.replace(/\{[^}]+\}/g, '…'))}</button>`).join('')}
+    </div>` : ''}
     <div class="cons">
       <div>
         <div class="res-list">${comps}</div>
@@ -1138,12 +1471,22 @@ document.addEventListener('click', e=>{
   }
   if(e.target.closest('#doBuild')){
     consNote = '';
-    const r = assemble(aimMeal);
-    built = r || [];
-    if(!r) consNote = 'В разделе «Что есть дома» не отмечено ни одного белкового продукта — без него приём не собрать.';
+    const r = assembleDish(aimMeal, e.target.closest('#doBuild').dataset.tpl || null);
+    built = r ? r.items : [];
+    builtTpl = r ? r.tpl : null;
+    if(!r) consNote = 'Из отмеченных продуктов не собирается ни одно блюдо для этого приёма. Отметьте больше — хотя бы мясо или творог, овощ и гарнир.';
     render(); return;
   }
-  if(e.target.id === 'doClear'){ built = []; consNote = ''; render(); return; }
+  const dp = e.target.closest('[data-dish]');
+  if(dp){
+    consNote = '';
+    const r = assembleDish(aimMeal, dp.dataset.dish);
+    built = r ? r.items : [];
+    builtTpl = r ? r.tpl : null;
+    if(!r) consNote = 'Для этого блюда не хватает продуктов в кладовке.';
+    render(); return;
+  }
+  if(e.target.id === 'doClear'){ built = []; builtTpl = null; consNote = ''; render(); return; }
   const tb = e.target.closest('[data-theme-set]');
   if(tb){ theme = tb.dataset.themeSet; store.set('kotel.theme',theme); applyTheme(); return; }
   const gb = e.target.closest('[data-go]');
@@ -1166,7 +1509,7 @@ document.addEventListener('change', e=>{
   if(e.target.id === 'baseSel' && e.target.value){
     const [di,mi] = e.target.value.split('.').map(Number);
     const r = fromMeal(di,mi);
-    built = r.parts;
+    built = r.parts; builtTpl = null;
     consNote = r.parts.length
       ? (r.unknown ? `«${r.title}»: ${r.unknown} из компонентов — готовое блюдо, его КБЖУ смотрите в рецептах. Остальное можно править здесь.` : '')
       : `«${r.title}» собран из готового блюда, а конструктор работает с сырыми продуктами. Откройте раздел «Рецепты», чтобы поменять навеску там.`;
