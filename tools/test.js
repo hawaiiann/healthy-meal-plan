@@ -446,6 +446,77 @@ const probe = `
 
   console.log('проблем в разделе «на двоих»:', pr);
 
+  // конструктор: собранное блюдо складывается на двоих
+  let cn = 0;
+  profiles = {}; swaps = {}; consPair = true;
+  for (const f of allFoods()) pantry[f.n] = true;
+  for (const meal of ['Завтрак', 'Обед', 'Ужин', 'Перекус']) {
+    aimMeal = meal;
+    for (const tpl of dishesFor(meal)) {
+      for (const w of ['m', 'w']) {
+        who = w;
+        const r = assembleDish(meal, tpl.id);
+        if (!r) continue;
+        built = r.items; builtTpl = r.tpl;
+        const was = JSON.stringify(built.map(x => [x.n, x.g]));
+        const PV = consPairView();
+        if (!PV) { cn++; console.log('  сборка не сложилась:', tpl.id, meal); continue; }
+
+        // расчёт второй порции не трогает то, что собрано
+        if (JSON.stringify(built.map(x => [x.n, x.g])) !== was) { cn++; console.log('  вторая порция изменила первую:', tpl.id); }
+        // состав одинаковый, отличается только навеска
+        for (const x of PV.rows) {
+          if (Math.abs(x.g - (x.m + x.w)) > 0.01) { cn++; console.log('  всего не равно сумме:', tpl.id, x.n); }
+          if (!(x.m > 0) || !(x.w > 0)) { cn++; console.log('  продукт есть только в одной тарелке:', tpl.id, x.n); }
+        }
+        if (PV.rows.length !== new Set(built.map(x => x.n)).size) { cn++; console.log('  состав разошёлся:', tpl.id); }
+        // тарелки различаются пропорционально, а не за счёт одного продукта
+        const rt = PV.aimW.k / PV.aimM.k;
+        for (const x of PV.rows) {
+          const r2 = x.w / x.m;
+          if (r2 < rt * 0.55 || r2 > rt * 1.7) { cn++; console.log('  навеска гуляет:', tpl.id, x.n, Math.round(x.m), '/', Math.round(x.w)); }
+        }
+        // каждая порция попадает в свою норму
+        if (Math.abs(PV.vm.k - PV.aimM.k) > PV.aimM.k * 0.15) { cn++; console.log('  его порция мимо нормы:', tpl.id, meal, Math.round(PV.vm.k), 'цель', PV.aimM.k); }
+        if (Math.abs(PV.vw.k - PV.aimW.k) > PV.aimW.k * 0.15) { cn++; console.log('  её порция мимо нормы:', tpl.id, meal, Math.round(PV.vw.k), 'цель', PV.aimW.k); }
+        // общий вес по калориям — это ровно две порции
+        if (Math.abs(sumOf(PV.total).k - (PV.vm.k + PV.vw.k)) > 2) { cn++; console.log('  общий вес не равен двум порциям:', tpl.id); }
+        // порядок готовки собирается на общий вес
+        if (!PV.steps) { cn++; console.log('  нет порядка готовки на двоих:', tpl.id); }
+        if (bad(pageCons()).length) { cn++; console.log('  ПРОБЛЕМА отрисовки конструктора на двоих:', tpl.id, bad(pageCons()).join(',')); }
+      }
+    }
+  }
+
+  // расчёт не зависит от того, кто выбран в шапке
+  aimMeal = 'Ужин';
+  who = 'm';
+  const rr = assembleDish('Ужин', 'shakshuka');
+  if (!rr) { cn++; console.log('  шакшука не собралась'); }
+  else {
+    built = rr.items; builtTpl = rr.tpl;
+    // вторая порция держится пропорции: одна морковка не отдувается за всех
+    const twin = twinOf(rr.items, aimFor('Ужин', 'w').k);
+    const ratio = aimFor('Ужин', 'w').k / aimFor('Ужин', 'm').k;
+    twin.forEach((x, ix) => {
+      const own = rr.items[ix].g, r2 = x.g / own;
+      if (x.n !== rr.items[ix].n) { cn++; console.log('  состав второй порции съехал:', x.n); }
+      if (r2 < ratio * 0.6 || r2 > ratio * 1.6) {
+        cn++; console.log('  навеска гуляет:', x.n, own, '->', x.g, 'при пропорции', ratio.toFixed(2));
+      }
+    });
+
+    // блок виден в разметке и убирается тумблером
+    who = 'm'; built = rr.items;
+    if (pageCons().indexOf('Сложить на двоих') < 0) { cn++; console.log('  блока «сложить на двоих» нет в конструкторе'); }
+    consPair = false;
+    if (pageCons().indexOf('Сложить на двоих') >= 0) { cn++; console.log('  тумблер не убирает блок'); }
+    consPair = true;
+  }
+  built = []; builtTpl = null;
+  if (consPairView()) { cn++; console.log('  пустая сборка не должна складываться'); }
+  console.log('проблем со сложением в конструкторе:', cn);
+
   console.log('сегодня по календарю: индекс ' + TODAY + ' -> ' + PLAN.days[TODAY].name);
 })();
 `;
