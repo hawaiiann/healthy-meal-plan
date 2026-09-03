@@ -598,6 +598,105 @@ const probe = `
   if (dayApart(dd) !== 0) { sy++; console.log('  сброс замен не вернул общий день'); }
   console.log('проблем с переносом набора дня:', sy);
 
+  { // блок готовки ×2 держим в своей области видимости
+  // готовка с запасом: удваивается кастрюля, а не тарелки
+  let x2 = 0;
+  profiles = {}; swaps = {}; who = 'm'; day = 0; cookX2 = false;
+
+  if (pairHead().indexOf('Всего') < 0) { x2++; console.log('  без запаса шапка должна быть «Всего»'); }
+  const x2Before = PLAN.days.map((_, d) => PLAN.days[d].meals.map((_, mi) => {
+    const P = pairMeal(d, mi);
+    return { rows: P.rows.map(r => [r.n, r.g, r.m, r.w]), k: [P.A.V.v.k, P.B.V.v.k], plate: [P.pm.dish, P.pw.dish] };
+  }));
+  const dayBefore = [dayTotals(0, 'm').k, dayTotals(0, 'w').k];
+  const stepBefore = (() => { const P = pairMeal(0, 2); const s = pairSteps(P); return s ? s.steps.join(' ') : ''; })();
+
+  cookX2 = true;
+  if (pairHead().indexOf('На два дня') < 0) { x2++; console.log('  с запасом шапка должна меняться'); }
+  if (pairHead(1).indexOf('Всего') < 0) { x2++; console.log('  явная единица должна отменять множитель'); }
+
+  for (let d = 0; d < PLAN.days.length; d++) {
+    for (let mi = 0; mi < PLAN.days[d].meals.length; mi++) {
+      const P = pairMeal(d, mi), was = x2Before[d][mi];
+      // тарелки не трогаем — это норма человека, а не объём кастрюли
+      if (JSON.stringify([P.pm.dish, P.pw.dish]) !== JSON.stringify(was.plate)) {
+        x2++; console.log('  запас изменил тарелку:', PLAN.days[d].name, mi);
+      }
+      if (JSON.stringify([P.A.V.v.k, P.B.V.v.k]) !== JSON.stringify(was.k)) {
+        x2++; console.log('  запас изменил калории приёма:', PLAN.days[d].name, mi);
+      }
+      // а вот столбец «сколько готовить» ровно удвоился
+      P.rows.forEach((r, ri) => {
+        const html = pairRow(r);
+        const want = gTxt(r.n, r.g * 2);
+        if (html.indexOf('<b>' + want + '</b>') < 0) { x2++; console.log('  столбец готовки не удвоился:', r.n, want); }
+        if (r.g !== was.rows[ri][1] || r.m !== was.rows[ri][2] || r.w !== was.rows[ri][3]) {
+          x2++; console.log('  сам расчёт приёма поехал от множителя:', r.n);
+        }
+      });
+    }
+  }
+  if (JSON.stringify([dayTotals(0, 'm').k, dayTotals(0, 'w').k]) !== JSON.stringify(dayBefore)) {
+    x2++; console.log('  запас изменил итог дня');
+  }
+
+  // порядок готовки пересчитан на двойной объём
+  const stepAfter = (() => { const P = pairMeal(0, 2); const s = pairSteps(P); return s ? s.steps.join(' ') : ''; })();
+  if (stepBefore && stepAfter === stepBefore) { x2++; console.log('  шаги не пересчитались на двойной объём'); }
+  if (stepBefore && pairSteps(pairMeal(0, 2), 1).steps.join(' ') !== stepBefore) {
+    x2++; console.log('  явная единица не вернула обычные шаги');
+  }
+
+  // разметка: строка остатка есть, напитки не удваиваются
+  const html2 = pagePair();
+  if (html2.indexOf('Остаётся на завтра') < 0) { x2++; console.log('  нет строки остатка на завтра'); }
+  if (html2.indexOf('Сварить всего') < 0) { x2++; console.log('  нет строки «сварить всего»'); }
+  if (html2.indexOf('Что достать и взвесить на два дня') < 0) { x2++; console.log('  свод дня не помечен как двухдневный'); }
+  if (bad(html2).length) { x2++; console.log('  ПРОБЛЕМА отрисовки с запасом:', bad(html2).join(',')); }
+
+  profiles.m = { drinks: { cups: 2, ml: 50, sugar: 0, milk: 'молоко 2,5%' } };
+  const hd = pagePair();
+  if (hd.indexOf('Напитки — на один день') < 0) { x2++; console.log('  напитки не помечены как однодневные'); }
+  if (hd.indexOf('<b>100 мл</b>') < 0) { x2++; console.log('  молоко в чашки удвоилось, а не должно'); }
+  profiles = {};
+
+  // доля закладки больше единицы называется закладками, а не процентами
+  const rb = PLAN.recipes.find(r => r.outG);
+  if (rb) {
+    const x2Big = batchDetails({ n: rb.key, g: rb.outG * 0.8, m: 0, w: 0 });
+    if (x2Big.indexOf('закладки') < 0) { x2++; console.log('  перебор закладки не назван закладками'); }
+    if (x2Big.indexOf('%') >= 0) { x2++; console.log('  перебор закладки всё ещё в процентах'); }
+    const x2Small = batchDetails({ n: rb.key, g: rb.outG * 0.2, m: 0, w: 0 });
+    if (x2Small.indexOf('% закладки') < 0) { x2++; console.log('  малая доля должна оставаться в процентах'); }
+  }
+
+  // конструктор тоже удваивает кастрюлю, но не тарелки
+  for (const f of allFoods()) pantry[f.n] = true;
+  aimMeal = 'Ужин'; consPair = true;
+  const rx = assembleDish('Ужин', 'shakshuka');
+  if (rx) {
+    built = rx.items; builtTpl = rx.tpl;
+    cookX2 = false; const c1 = consPairView(), h1 = pageCons();
+    cookX2 = true;  const c2 = consPairView(), h2 = pageCons();
+    if (JSON.stringify([c1.pm, c1.pw]) !== JSON.stringify([c2.pm, c2.pw])) { x2++; console.log('  запас изменил тарелки в конструкторе'); }
+    if (Math.abs(c1.vm.k - c2.vm.k) > 0.01) { x2++; console.log('  запас изменил калории в конструкторе'); }
+    if (c1.steps && c2.steps && c1.steps.steps.join(' ') === c2.steps.steps.join(' ')) {
+      x2++; console.log('  шаги конструктора не пересчитались');
+    }
+    if (h2.indexOf('Остаётся на завтра') < 0) { x2++; console.log('  в конструкторе нет строки остатка'); }
+    if (h2.indexOf('двойной объём') < 0) { x2++; console.log('  в конструкторе не помечен двойной объём'); }
+    // столбец готовки двухдневный целиком: и калории, и белок, и цель
+    if (h2.indexOf('<b>' + Math.round((c2.vm.p + c2.vw.p) * 2) + ' г</b>') < 0) { x2++; console.log('  белок в конструкторе не удвоился'); }
+    if (h1.indexOf('Остаётся на завтра') >= 0) { x2++; console.log('  строка остатка висит без запаса'); }
+    if (bad(h2).length) { x2++; console.log('  ПРОБЛЕМА отрисовки конструктора с запасом'); }
+  }
+  built = []; builtTpl = null;
+
+  cookX2 = false;
+  if (pagePair().indexOf('Остаётся на завтра') >= 0) { x2++; console.log('  тумблер не выключает запас'); }
+  console.log('проблем с готовкой ×2:', x2);
+  }
+
   console.log('сегодня по календарю: индекс ' + TODAY + ' -> ' + PLAN.days[TODAY].name);
 })();
 `;
