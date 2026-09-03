@@ -668,6 +668,9 @@ function meter(p,k){
 }
 const TAG = {'Завтрак':'tg-br','Обед':'tg-lu','Ужин':'tg-di','Перекус':'tg-sn','Вечер':'tg-sw'};
 const TAGN = {'Вечер':'Сладкое'};
+const AT = { m:'него', w:'неё' };       /* у кого */
+const POSS = { m:'его', w:'её' };        /* чья норма */
+const mealsWord = n => n === 1 ? 'один приём' : n < 5 ? n + ' приёма' : n + ' приёмов';
 
 function tiles(v){
   const rows=[['t-kcal','fire','Калории',nf(v.k)+' ккал'],['t-prot','leaf','Белок',v.p+' г'],
@@ -743,6 +746,7 @@ let openSwap = null;
 let consNote = '';
 let aimMeal = 'Обед';
 let consPair = store.get('kotel.conspair', true) !== false;
+let syncNote = '';
 let theme = ['auto','light','dark'].includes(store.get('kotel.theme','auto')) ? store.get('kotel.theme','auto') : 'auto';
 
 /* тема: «авто» снимает штамп и отдаёт решение prefers-color-scheme */
@@ -1705,9 +1709,9 @@ function consPairView(){
   add(A, 'm'); add(B, 'w');
   const rows = Array.from(map.values()).map(e => Object.assign(e, { g: e.m + e.w }));
   const total = A.map((x, i) => Object.assign({}, x, { g: x.g + (B[i] ? B[i].g : 0) }));
-  const vm = sumOf(A), vw = sumOf(B);
+  const vm = sumOf(A), vw = sumOf(B), pm = plateOf(A), pw = plateOf(B);
   const st = builtTpl ? stepsFor(builtTpl, total) : null;
-  return { rows, total, vm, vw, other,
+  return { rows, total, vm, vw, pm, pw, other,
            aimM: aimFor(aimMeal, 'm'), aimW: aimFor(aimMeal, 'w'),
            steps: st && !st.broken ? st : null };
 }
@@ -1802,7 +1806,12 @@ function splitParts(text){
 function partsOfMeal(di, mi, k){
   const V = mealView(di, mi, k);
   return { V, parts: (V.items && V.items.length)
-    ? V.items.map(x => ({ n:x.n, g:x.g, r:x.r })) : splitParts(V.qty) };
+    ? V.items.map(x => ({ n:x.n, g:x.g, r:x.r, side:x.side })) : splitParts(V.qty) };
+}
+/* Калории на тарелку не положишь. Считаем ещё и вес: сколько граммов
+   готового блюда наливать каждому и сколько идёт вприкуску. */
+function plateOf(parts){
+  return parts.reduce((a, x) => { a[x.side ? 'side' : 'dish'] += x.g; return a; }, { dish:0, side:0 });
 }
 const gTxt = (n, g) => {
   const f = anyFood(n);
@@ -1820,7 +1829,8 @@ function pairMeal(di, mi){
   add(A.parts, 'm'); add(B.parts, 'w');
   const rows = Array.from(map.values()).map(e => Object.assign(e, { g: e.m + e.w }));
   const kk = A.V.v.k + B.V.v.k;
-  return { di, mi, A, B, rows, together, k:kk, share: kk > 0 ? Math.round(A.V.v.k / kk * 100) : 50 };
+  return { di, mi, A, B, rows, together, k:kk, share: kk > 0 ? Math.round(A.V.v.k / kk * 100) : 50,
+           pm: plateOf(A.parts), pw: plateOf(B.parts) };
 }
 /* порядок готовки, пересчитанный на общий вес: одна сковорода на двоих */
 function pairSteps(P){
@@ -1942,6 +1952,38 @@ function dropSwap(di, mi){
   store.set('kotel.swaps', swaps);
 }
 
+/* Набор блюд на день подбирается один раз и для двоих сразу: незачем
+   перещёлкивать те же замены во втором меню. Переносим состав как есть,
+   а навеску пересчитываем под норму второго — порции у них разные,
+   и копировать их один в один нельзя. */
+function daySwaps(di, k){
+  return PLAN.days[di].meals.reduce((n, _, mi) => {
+    const sw = swaps[swapKey(di, mi, k)];
+    return n + (sw && sw.items && sw.items.length ? 1 : 0);
+  }, 0);
+}
+function dayApart(di){
+  return PLAN.days[di].meals.reduce((n, _, mi) => n + (pairMeal(di, mi).together ? 0 : 1), 0);
+}
+function syncDay(di, from){
+  const src = from || who, dst = src === 'm' ? 'w' : 'm';
+  const dayId = PLAN.days[di].id, f = mealFactor(dst, dayId);
+  let moved = 0, cleared = 0;
+  PLAN.days[di].meals.forEach((m, mi) => {
+    const sw = swaps[swapKey(di, mi, src)], key = swapKey(di, mi, dst);
+    if(!sw || !sw.items || !sw.items.length){
+      if(swaps[key]){ delete swaps[key]; cleared++; }
+      return;
+    }
+    const aimK = Math.max(60, m[dst].k * f);
+    swaps[key] = { title: sw.title, note: sw.note || '', tplId: sw.tplId || null,
+                   items: twinOf(sw.items, aimK) };
+    moved++;
+  });
+  store.set('kotel.swaps', swaps);
+  return { moved, cleared, dst };
+}
+
 function fromMeal(di, mi){
   const m = PLAN.days[di].meals[mi];
   const parts = m[who].qty.split(', ').map(t => {
@@ -2001,9 +2043,11 @@ function pageCons(){
   const pairBlock = !PV ? '' : `
   <div class="card sec">
     <div class="sec-h"><h2>Сложить на двоих</h2><span class="lbl">одна сковорода, две тарелки</span></div>
-    <p class="lead" style="margin-bottom:14px">Состав тот же, навеска — под вторую норму. Столбец «Всего» — сколько продуктов взять, соседние — сколько потом разложить по тарелкам.</p>
+    <p class="lead" style="margin-bottom:14px">Состав тот же, навеска — под вторую норму. Столбец «Всего» — сколько продуктов взять, соседние — сколько потом разложить по тарелкам. Строка «на тарелку» — это вес навески. У заготовок он и есть вес готового блюда, а у сырого мяса на пару и в духовке уйдёт ещё 10–15% воды; пропорция деления от этого не меняется.</p>
     <div class="split">${pairHead}${PV.rows.map(r => pairRow(r)).join('')}
-      <div class="tot"><span>Итого</span><b>${nf(PV.vm.k + PV.vw.k)} ккал</b><i>${nf(PV.vm.k)}</i><i>${nf(PV.vw.k)}</i></div>
+      <div class="tot"><span>На тарелку</span><b>${nf(PV.pm.dish + PV.pw.dish)} г</b><i>${nf(PV.pm.dish)} г</i><i>${nf(PV.pw.dish)} г</i></div>
+      ${PV.pm.side + PV.pw.side ? `<div><span>Вприкуску</span><b>${nf(PV.pm.side + PV.pw.side)} г</b><i>${nf(PV.pm.side)} г</i><i>${nf(PV.pw.side)} г</i></div>` : ''}
+      <div><span>Калории</span><b>${nf(PV.vm.k + PV.vw.k)} ккал</b><i>${nf(PV.vm.k)}</i><i>${nf(PV.vw.k)}</i></div>
       <div><span>Белок</span><b>${Math.round(PV.vm.p + PV.vw.p)} г</b><i>${Math.round(PV.vm.p)}</i><i>${Math.round(PV.vw.p)}</i></div>
       <div><span>Цель приёма</span><b>${nf(PV.aimM.k + PV.aimW.k)} ккал</b><i>${nf(PV.aimM.k)}</i><i>${nf(PV.aimW.k)}</i></div>
     </div>
@@ -2495,6 +2539,7 @@ function mealRow(m, di, mi){
 }
 function pageWeek(){
   const d=PLAN.days[day], tgt=targetFor(who, d.id);
+  const apart = dayApart(day), other = who === 'm' ? 'w' : 'm';
   const t=dayTotals(day), v={k:Math.round(t.k),p:Math.round(t.p),f:Math.round(t.f),c:Math.round(t.c)};
   const tabs = PLAN.days.map((x,i)=>
     `<button type="button" data-day="${i}" aria-pressed="${i===day}">${x.name.slice(0,3)}${i===TODAY?" •":""}<i>${nf(dayTotals(i).k)}</i></button>`).join('');
@@ -2520,7 +2565,12 @@ function pageWeek(){
     <div class="sec-h"><h2>Приёмы пищи</h2><span class="lbl">навеска для: ${person(who).name.toLowerCase()}</span></div>
     <div class="meals">${d.meals.map((m,mi) => mealRow(m, day, mi)).join('')}${drinkRow()}</div>
     <p class="lead" style="margin:12px 0 0">Готовите сразу на двоих? Тогда эти навески нужно сложить с её — и знать, сколько потом положить каждому.</p>
-    <button type="button" class="btn btn-2" data-goto="pair" style="margin-top:9px">${svg('two')}Показать день на двоих</button>
+    <div class="row" style="margin-top:9px;gap:7px;flex-wrap:wrap">
+      <button type="button" class="btn btn-2" data-goto="pair">${svg('two')}Показать день на двоих</button>
+      ${apart ? `<button type="button" class="btn" data-sync="${day}">${svg('swap')}Поставить этот набор обоим</button>` : ''}
+    </div>
+    ${apart ? `<p class="lead" style="margin:9px 0 0">В этом дне ${mealsWord(apart)} ${apart === 1 ? 'отличается' : 'отличаются'} от того, что стоит у ${AT[other]}. Кнопка перенесёт этот состав целиком, а навеску пересчитает под ${POSS[other]} норму.</p>` : ''}
+    ${syncNote ? `<p class="verdict v-ok" style="margin-top:10px">${esc(syncNote)}</p>` : ''}
   </div>`;
 }
 
@@ -2552,7 +2602,9 @@ function pairCard(P){
   return `<div class="item">
     <div class="meal-h"><h4>${esc(V.title)}</h4><span class="tag ${cls}">${nm}</span><span class="lbl">делится ${P.share} / ${100 - P.share}</span></div>
     <div class="split">${pairHead}${P.rows.map(r => pairRow(r)).join('')}
-      <div class="tot"><span>Итого</span><b>${nf(P.k)} ккал</b><i>${nf(P.A.V.v.k)}</i><i>${nf(P.B.V.v.k)}</i></div>
+      <div class="tot"><span>На тарелку</span><b>${nf(P.pm.dish + P.pw.dish)} г</b><i>${nf(P.pm.dish)} г</i><i>${nf(P.pw.dish)} г</i></div>
+      ${P.pm.side + P.pw.side ? `<div><span>Вприкуску</span><b>${nf(P.pm.side + P.pw.side)} г</b><i>${nf(P.pm.side)} г</i><i>${nf(P.pw.side)} г</i></div>` : ''}
+      <div><span>Калории</span><b>${nf(P.k)} ккал</b><i>${nf(P.A.V.v.k)}</i><i>${nf(P.B.V.v.k)}</i></div>
     </div>
     ${st ? `<ol class="mini-steps" style="margin-top:9px">${st.steps.map(t => `<li>${esc(t)}</li>`).join('')}</ol>` : ''}
     ${!st && V.note ? `<p class="n">${esc(V.note)}</p>` : ''}
@@ -2575,7 +2627,7 @@ function pagePair(){
   <div class="card pillbar">${tabs}</div>
   <div class="card sec">
     <div class="sec-h"><h2>${esc(d.name)}: одна готовка на двоих</h2><span class="lbl">${esc(d.sub)}</span></div>
-    <p class="lead" style="margin-bottom:14px">Готовим один раз, а норм две. Здесь навески обоих сложены: столбец «Всего» — сколько продуктов взять и положить в кастрюлю, два соседних — сколько потом раскладывать по тарелкам. Складываются только приёмы, где у вас одно и то же блюдо${apart ? '; сегодня ' + apart + ' идёт отдельно' : ''}.</p>
+    <p class="lead" style="margin-bottom:14px">Готовим один раз, а норм две. Здесь навески обоих сложены: столбец «Всего» — сколько продуктов взять и положить в кастрюлю, два соседних — сколько потом раскладывать по тарелкам. Складываются только приёмы, где у вас одно и то же блюдо${apart ? '; в этом дне ' + mealsWord(apart) + (apart === 1 ? ' идёт' : ' идут') + ' отдельно' : ''}.</p>
     <div class="norm-out">
       <div><span class="lbl">Всего за день</span><b>${nf(both)}</b> <s>ккал</s></div>
       <div><span class="lbl">Ему</span><b>${nf(tm.k)}</b> <s>ккал</s></div>
@@ -2583,10 +2635,14 @@ function pagePair(){
       <div><span class="lbl">Пропорция</span><b>${sh} / ${100 - sh}</b> <s>ему / ей</s></div>
       <div><span class="lbl">Белок на двоих</span><b>${Math.round(tm.p + tw.p)}</b> <s>г</s></div>
     </div>
+    ${apart ? `<div class="row" style="margin-top:12px"><button type="button" class="btn" data-sync="${day}">${svg('swap')}Сделать день одинаковым</button></div>
+    <p class="lead" style="margin:9px 0 0">${cap(mealsWord(apart))} собран${apart === 1 ? '' : 'ы'} по-разному — сложить такое нельзя. Кнопка перенесёт состав того, кто выбран в шапке (сейчас ${person(who).name}), второму и пересчитает навеску под ${POSS[who === "m" ? "w" : "m"]} норму.</p>` : ''}
+    ${syncNote ? `<p class="verdict v-ok" style="margin-top:10px">${esc(syncNote)}</p>` : ''}
     <p class="verdict v-ok" style="margin-top:12px">Разница между порциями — примерно ${Math.round((tm.k / Math.max(1, tw.k) - 1) * 100)}%. Это не «ему больше, потому что мужчина», а разные нормы: у него больше масса и глубже дефицит. Проще всего готовить общий вес и делить на глаз в этой пропорции, а белковую часть — по весам.</p>
   </div>
   <div class="card sec">
     <div class="sec-h"><h2>Приёмы пищи</h2><span class="lbl">общий вес и как делить</span></div>
+    <p class="lead" style="margin-bottom:14px">Строка «на тарелку» — это вес навески. У заготовок он и есть вес готового блюда, а у сырого мяса на пару и в духовке уйдёт ещё 10–15% воды; пропорция деления от этого не меняется.</p>
     <div class="grid" style="gap:9px">${cards.join('')}</div>
   </div>
   <div class="card sec">
@@ -2781,7 +2837,18 @@ function render(){
 
 document.addEventListener('click', e=>{
   const nb = e.target.closest('#nav button');
-  if(nb){ page = nb.dataset.page; render(); window.scrollTo({top:0,behavior:'smooth'}); return; }
+  if(nb){ page = nb.dataset.page; syncNote = ''; render(); window.scrollTo({top:0,behavior:'smooth'}); return; }
+  const sy = e.target.closest('[data-sync]');
+  if(sy){
+    const di = +sy.dataset.sync, r = syncDay(di);
+    const P = person(r.dst), t = dayTotals(di, r.dst);
+    const nn = r.moved === 1 ? 'блюдо' : r.moved < 5 ? 'блюда' : 'блюд';
+    syncNote = r.moved
+      ? 'Перенесено ' + r.moved + ' ' + nn + (r.cleared ? ', ещё ' + r.cleared + ' вернулось к плану' : '') +
+        '. У ' + AT[r.dst] + ' теперь тот же состав, а навеска пересчитана под ' + POSS[r.dst] + ' норму: ' + nf(t.k) + ' ккал за день.'
+      : 'Замен в этом дне нет — день у ' + AT[r.dst] + ' вернулся к плану: ' + nf(t.k) + ' ккал.';
+    render(); return;
+  }
   const gt = e.target.closest('[data-goto]');
   if(gt){ page = gt.dataset.goto; clearQuery(); render(); window.scrollTo({top:0,behavior:'smooth'}); return; }
   const sb = e.target.closest('[data-who]');

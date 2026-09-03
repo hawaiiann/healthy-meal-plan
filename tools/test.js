@@ -517,6 +517,87 @@ const probe = `
   if (consPairView()) { cn++; console.log('  пустая сборка не должна складываться'); }
   console.log('проблем со сложением в конструкторе:', cn);
 
+  // вес на тарелку: столбцы «он/она» складываются в то, что реально наливаешь
+  let pl = 0;
+  profiles = {}; swaps = {}; who = 'w';
+  for (let d = 0; d < PLAN.days.length; d++) {
+    for (let mi = 0; mi < PLAN.days[d].meals.length; mi++) {
+      const P = pairMeal(d, mi);
+      const gm = P.rows.reduce((a, r) => a + r.m, 0), gw = P.rows.reduce((a, r) => a + r.w, 0);
+      if (Math.abs((P.pm.dish + P.pm.side) - gm) > 0.01) { pl++; console.log('  его тарелка не сходится:', PLAN.days[d].name, mi); }
+      if (Math.abs((P.pw.dish + P.pw.side) - gw) > 0.01) { pl++; console.log('  её тарелка не сходится:', PLAN.days[d].name, mi); }
+      if (!(P.pm.dish > 0) || !(P.pw.dish > 0)) { pl++; console.log('  пустая тарелка:', PLAN.days[d].name, mi); }
+    }
+  }
+  if (pagePair().indexOf('На тарелку') < 0) { pl++; console.log('  в приёме нет строки «на тарелку»'); }
+  console.log('проблем с весом на тарелку:', pl);
+
+  // перенос набора дня на второго
+  let sy = 0;
+  profiles = {}; swaps = {};
+  const dd = 0, dayId = PLAN.days[dd].id;
+  if (dayApart(dd) !== 0) { sy++; console.log('  чистый день не должен расходиться'); }
+
+  // ставим замены себе и лишнюю замену ей — синхронизация должна убрать её
+  who = 'm';
+  let put = 0;
+  for (let mi = 0; mi < PLAN.days[dd].meals.length && put < 2; mi++) {
+    const O = swapOptions(dd, mi);
+    if (!O.dishes.length) continue;
+    applySwap(dd, mi, { title: O.dishes[0].tpl.short, tplId: O.dishes[0].tpl.id, items: O.dishes[0].items });
+    put++;
+  }
+  if (put < 2) { sy++; console.log('  не удалось поставить две замены для теста'); }
+  who = 'w';
+  const extra = PLAN.days[dd].meals.length - 1;
+  const OE = swapOptions(dd, extra);
+  if (OE.dishes.length) applySwap(dd, extra, { title: OE.dishes[0].tpl.short, tplId: OE.dishes[0].tpl.id, items: OE.dishes[0].items });
+
+  who = 'm';
+  if (dayApart(dd) === 0) { sy++; console.log('  расхождение не увиделось'); }
+  const rs = syncDay(dd);
+  if (rs.moved !== put) { sy++; console.log('  перенесено не столько замен:', rs.moved, 'вместо', put); }
+  if (OE.dishes.length && rs.cleared !== 1) { sy++; console.log('  лишняя замена второго не снялась:', rs.cleared); }
+  if (dayApart(dd) !== 0) { sy++; console.log('  после переноса день всё ещё расходится:', dayApart(dd)); }
+
+  // состав одинаковый, навеска — под её норму, день по-прежнему в цель
+  for (let mi = 0; mi < PLAN.days[dd].meals.length; mi++) {
+    const P = pairMeal(dd, mi);
+    // одинаковый состав гарантируется там, где стоит перенесённая замена:
+    // в плановых приёмах у него законно бывает лишний компонент
+    if (swaps[swapKey(dd, mi, 'm')]) {
+      const nm = P.A.parts.map(x => x.n).sort().join('|'), nw = P.B.parts.map(x => x.n).sort().join('|');
+      if (nm !== nw) { sy++; console.log('  состав разошёлся после переноса:', mi); }
+    }
+    const want = PLAN.days[dd].meals[mi].w.k * mealFactor('w', dayId);
+    if (Math.abs(P.B.V.v.k - want) > Math.max(35, want * 0.15)) {
+      sy++; console.log('  её приём мимо своей нормы:', mi, Math.round(P.B.V.v.k), 'цель', Math.round(want));
+    }
+    if (P.A.V.v.k < P.B.V.v.k - 1 && PLAN.days[dd].meals[mi].label !== 'Вечер') {
+      sy++; console.log('  после переноса её порция больше его:', mi, P.B.V.v.k, 'vs', P.A.V.v.k);
+    }
+  }
+  const tw2 = dayTotals(dd, 'w').k, tgt2 = targetFor('w', dayId);
+  if (Math.abs(tw2 - tgt2) > tgt2 * 0.05) { sy++; console.log('  её день ушёл от цели:', Math.round(tw2), 'цель', tgt2); }
+
+  // кнопка появляется только когда есть что переносить
+  who = 'm'; day = dd;
+  if (pageWeek().indexOf('data-sync') >= 0) { sy++; console.log('  кнопка переноса висит на сведённом дне'); }
+  swaps = {}; who = 'm';
+  const O2 = swapOptions(dd, 2);
+  if (O2.dishes.length) {
+    applySwap(dd, 2, { title: O2.dishes[0].tpl.short, tplId: O2.dishes[0].tpl.id, items: O2.dishes[0].items });
+    if (pageWeek().indexOf('data-sync') < 0) { sy++; console.log('  кнопки переноса нет при расхождении'); }
+    if (pagePair().indexOf('data-sync') < 0) { sy++; console.log('  кнопки переноса нет в разделе «на двоих»'); }
+    if (bad(pageWeek()).length || bad(pagePair()).length) { sy++; console.log('  ПРОБЛЕМА отрисовки с кнопкой переноса'); }
+  }
+  // перенос в обратную сторону тоже работает
+  syncDay(dd, 'w');
+  if (dayApart(dd) !== 0) { sy++; console.log('  обратный перенос не свёл день'); }
+  swaps = {};
+  if (dayApart(dd) !== 0) { sy++; console.log('  сброс замен не вернул общий день'); }
+  console.log('проблем с переносом набора дня:', sy);
+
   console.log('сегодня по календарю: индекс ' + TODAY + ' -> ' + PLAN.days[TODAY].name);
 })();
 `;
