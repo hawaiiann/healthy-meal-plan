@@ -11,7 +11,7 @@ const probe = `
   for (const w of ['w','m']) {
     who = w;
     for (const k of Object.keys(RENDER)) {
-      const reps = (k === 'week') ? PLAN.days.length : 1;
+      const reps = (k === 'week' || k === 'pair') ? PLAN.days.length : 1;
       for (let d = 0; d < reps; d++) {
         day = d;
         const b = bad(RENDER[k]());
@@ -358,6 +358,93 @@ const probe = `
   if (drinkTotals('m').k !== 0) { dk++; console.log('  сброс не убрал напитки'); }
   if (Math.abs(dayTotals(0).k - beforeDay) > 1) { dk++; console.log('  день не вернулся после сброса напитков'); }
   console.log('проблем в напитках:', dk);
+
+  // на двоих: сумма, деление, ничего не потеряно
+  let pr = 0;
+  profiles = {}; swaps = {}; who = 'w';
+  for (let d = 0; d < PLAN.days.length; d++) {
+    for (let mi = 0; mi < PLAN.days[d].meals.length; mi++) {
+      const P = pairMeal(d, mi);
+      if (!P.together) { pr++; console.log('  приём должен складываться:', PLAN.days[d].name, mi); continue; }
+
+      // столбец «Всего» — это ровно сумма двух тарелок
+      for (const r of P.rows) {
+        if (Math.abs(r.g - (r.m + r.w)) > 0.01) { pr++; console.log('  всего не равно сумме:', r.n); }
+        if (r.g <= 0) { pr++; console.log('  нулевая строка:', r.n, PLAN.days[d].name); }
+      }
+      // ни один продукт из навесок не потерялся при разборе
+      const names = new Set(P.rows.map(r => r.n));
+      for (const k of ['m', 'w']) {
+        for (const piece of mealView(d, mi, k).qty.split(', ')) {
+          const w = piece.split(' '), nm = w.slice(0, w.length - 2).join(' ');
+          if (!names.has(nm)) { pr++; console.log('  продукт потерялся:', nm, PLAN.days[d].name); }
+        }
+      }
+      // калории, пересобранные из общего веса, сходятся с суммой двух приёмов
+      let kk = 0;
+      for (const r of P.rows) { const f = anyFood(r.n); if (f) kk += f.k * r.g / 100; }
+      if (Math.abs(kk - P.k) > Math.max(25, P.k * 0.04)) {
+        pr++; console.log('  общий вес не бьётся по калориям:', PLAN.days[d].name, mi, Math.round(kk), 'vs', P.k);
+      }
+      // его порция нигде не меньше её: у плиты обратное читается как ошибка
+      if (PLAN.days[d].meals[mi].label !== 'Вечер' && P.A.V.v.k < P.B.V.v.k) {
+        pr++; console.log('  её порция больше его:', PLAN.days[d].name, PLAN.days[d].meals[mi].label, P.B.V.v.k, 'vs', P.A.V.v.k);
+      }
+      // деление в процентах осмысленное
+      if (!(P.share > 35 && P.share < 65)) { pr++; console.log('  странная пропорция деления:', P.share); }
+    }
+  }
+
+  // дневной свод — это сумма приёмов, ничего не задвоено и не потеряно
+  for (let d = 0; d < PLAN.days.length; d++) {
+    const D = pairDay(d), all = D.batch.concat(D.fresh);
+    const mm = new Map();
+    for (let mi = 0; mi < PLAN.days[d].meals.length; mi++)
+      for (const r of pairMeal(d, mi).rows) mm.set(r.n, (mm.get(r.n) || 0) + r.g);
+    if (all.length !== mm.size) { pr++; console.log('  в своде дня не тот набор продуктов:', PLAN.days[d].name, all.length, mm.size); }
+    for (const r of all) if (Math.abs(r.g - (mm.get(r.n) || 0)) > 0.01) { pr++; console.log('  свод дня разошёлся:', r.n); }
+    for (const r of D.batch) if (!RECIPE[r.n]) { pr++; console.log('  не заготовка в заготовках:', r.n); }
+    for (const r of D.fresh) if (RECIPE[r.n]) { pr++; console.log('  заготовка попала в свежее:', r.n); }
+  }
+
+  // разложение заготовки на сырые продукты сохраняет калорийность доли
+  for (const rc of PLAN.recipes) {
+    if (!rc.outG) { pr++; console.log('  у заготовки нет выхода:', rc.key); continue; }
+    const part = 500, f = part / rc.outG;
+    let kk = 0;
+    for (const x of rc.ing) { const fo = anyFood(x.n); if (fo) kk += fo.k * x.g * f / 100; else { pr++; console.log('  ингредиент не найден:', x.n); } }
+    const want = rc.per100.k * part / 100;
+    if (Math.abs(kk - want) > want * 0.03) { pr++; console.log('  разложение заготовки не сходится:', rc.key, Math.round(kk), 'vs', Math.round(want)); }
+  }
+
+  // расчёт не зависит от того, кто сейчас выбран в шапке
+  who = 'w'; const snapW = JSON.stringify(pairMeal(0, 1).rows);
+  who = 'm'; const snapM = JSON.stringify(pairMeal(0, 1).rows);
+  if (snapW !== snapM) { pr++; console.log('  расчёт на двоих зависит от выбранного человека'); }
+
+  // замена у одного превращает приём в «готовится отдельно»
+  const O = swapOptions(0, 1);
+  if (O.dishes.length) {
+    who = 'm'; applySwap(0, 1, { title: 'тест на двоих', tplId: O.dishes[0].tpl.id, items: O.dishes[0].items });
+    if (pairMeal(0, 1).together) { pr++; console.log('  замена не разделила приём'); }
+    if (pagePair().indexOf('Разные блюда') < 0) { pr++; console.log('  в разделе не видно, что блюда разошлись'); }
+    dropSwap(0, 1);
+    if (!pairMeal(0, 1).together) { pr++; console.log('  после отмены замены приём не сложился обратно'); }
+  }
+
+  // напитки в своде: общий объём молока
+  profiles.m = { drinks: { cups: 2, ml: 50, sugar: 0, milk: 'молоко 2,5%' } };
+  profiles.w = { drinks: { cups: 3, ml: 40, sugar: 5, milk: 'молоко 2,5%' } };
+  const PD = pairDrinks();
+  if (!PD || PD.cups !== 5) { pr++; console.log('  чашки на двоих не сложились'); }
+  if (!PD || PD.ml !== 2 * 50 + 3 * 40) { pr++; console.log('  молоко на двоих не сложилось:', PD && PD.ml); }
+  if (!PD || PD.sug !== 15) { pr++; console.log('  сахар на двоих не сложился'); }
+  if (pagePair().indexOf('в чашки') < 0) { pr++; console.log('  в своде дня нет строки напитков'); }
+  for (let d = 0; d < PLAN.days.length; d++) if (bad(pagePair()).length) { pr++; console.log('  ПРОБЛЕМА отрисовки с напитками', d); }
+  profiles = {};
+  if (pairDrinks()) { pr++; console.log('  сброс не убрал напитки из свода'); }
+
+  console.log('проблем в разделе «на двоих»:', pr);
 
   console.log('сегодня по календарю: индекс ' + TODAY + ' -> ' + PLAN.days[TODAY].name);
 })();

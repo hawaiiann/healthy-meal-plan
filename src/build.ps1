@@ -359,6 +359,27 @@ function ScaleDay($mealItems,$target){
   }
 }
 
+# Его дневная норма больше её на 15%, но раскладка по приёмам этого не
+# гарантировала: излишек оседал в одном приёме, а в соседнем его порция
+# оказывалась меньше её. У плиты это читается как ошибка, поэтому каждый
+# его приём подтягивается минимум до её уровня, а день пересчитывается в цель.
+function Balance($wAll,$mAll,$targetM){
+  $last = $mAll.Count-1
+  for($pass=0; $pass -lt 8; $pass++){
+    $moved = $false
+    for($j=0; $j -lt $last; $j++){
+      $wv = (Calc $wAll[$j])[0]; $mv = (Calc $mAll[$j])[0]
+      if($mv -le 0 -or $wv -le 0){ continue }
+      if($mv -ge $wv*1.02){ continue }
+      $f = ($wv*1.06)/$mv
+      foreach($it in $mAll[$j]){ $it[1] = RoundG $it[0] ($it[1]*$f) }
+      $moved = $true
+    }
+    ScaleDay $mAll $targetM
+    if(-not $moved){ break }
+  }
+}
+
 $DATA=@()
 $wkT=@(0.0,0.0,0.0,0.0); $mkT=@(0.0,0.0,0.0,0.0)
 foreach($d in $DAYS){
@@ -369,6 +390,7 @@ foreach($d in $DAYS){
   foreach($ml in $d.meals){ $wAll += ,(Parse $ml.w); $mAll += ,(Parse $ml.m) }
   ScaleDay $wAll $TW[$d.id]
   ScaleDay $mAll $TM[$d.id]
+  Balance  $wAll $mAll $TM[$d.id]
   $idx = 0
   foreach($ml in $d.meals){
     $wi = $wAll[$idx]; $mi = $mAll[$idx]; $idx++
@@ -534,7 +556,7 @@ foreach($r in $RECIPES){
   $recOut += [pscustomobject]@{
     key=$r.key; title=$r.title; gear=$r.gear; steps=$r.steps; hint=$r.hint; ing=$ingOut
     per100=[pscustomobject]@{ k=[math]::Round($r.per100[0]); p=[math]::Round($r.per100[1],1); f=[math]::Round($r.per100[2],1); c=[math]::Round($r.per100[3],1) }
-    pw=$r.pw; pm=$r.pm
+    pw=$r.pw; pm=$r.pm; outG=$r.yield
     vw=[pscustomobject]@{ k=[math]::Round($r.per100[0]*$r.pw/100); p=[math]::Round($r.per100[1]*$r.pw/100); f=[math]::Round($r.per100[2]*$r.pw/100); c=[math]::Round($r.per100[3]*$r.pw/100) }
     vm=[pscustomobject]@{ k=[math]::Round($r.per100[0]*$r.pm/100); p=[math]::Round($r.per100[1]*$r.pm/100); f=[math]::Round($r.per100[2]*$r.pm/100); c=[math]::Round($r.per100[3]*$r.pm/100) }
   }
@@ -569,8 +591,22 @@ foreach($pair in $CAT){
 }
 "продуктов в конструкторе: $($foodsOut.Count)"
 
+# Заготовки разбираются на сырые продукты, но мука, дрожжи и манка в кладовке
+# конструктора не нужны. Держим их отдельным словарём: КБЖУ доступно везде,
+# а список «что есть дома» не разбухает.
+$baseOut = @{}
+$known   = @($foodsOut | ForEach-Object { $_.n })
+$recKeys = @($RECIPES  | ForEach-Object { $_.key })
+foreach($n in ($DB.Keys | Sort-Object)){
+  if($known -contains $n -or $recKeys -contains $n){ continue }
+  $v = $DB[$n]
+  $baseOut[$n] = [pscustomobject]@{ k=[math]::Round($v[0],1); p=[math]::Round($v[1],1); f=[math]::Round($v[2],1); c=[math]::Round($v[3],1) }
+}
+"продуктов вне конструктора: $($baseOut.Count)"
+
 $plan = [pscustomobject]@{
   foods = $foodsOut
+  base = $baseOut
   people = [pscustomobject]@{
     w = [pscustomobject]@{ key='w'; name='Она'; meta='базовая порция'; note='вес в норме, цель — форма'; tdee=1940; deficit=12
                            kcal=[math]::Round($wkT[0]/7); prot=[math]::Round($wkT[1]/7); fat=[math]::Round($wkT[2]/7); carb=[math]::Round($wkT[3]/7)

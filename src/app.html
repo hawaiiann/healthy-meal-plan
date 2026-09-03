@@ -436,6 +436,30 @@ summary::-webkit-details-marker{display:none}
 .shopg label .amt{margin-left:auto; font-family:"JetBrains Mono",monospace; font-size:11.5px; color:var(--ink3); white-space:nowrap}
 
 /* ---------- заметки ---------- */
+.split{display:flex; flex-direction:column; gap:0}
+.split > div{display:grid; grid-template-columns:minmax(0,1fr) 74px 62px 62px; gap:8px; align-items:baseline;
+  padding:6px 0; border-bottom:1px dotted var(--line2)}
+.split > div:last-child{border-bottom:none}
+.split .sh{border-bottom:1px solid var(--line2); padding-bottom:5px}
+.split .sh span,.split .sh b,.split .sh i{font-family:Nunito,sans-serif; font-size:9.5px; font-weight:700;
+  letter-spacing:.09em; text-transform:uppercase; color:var(--ink3); font-style:normal}
+.split span{font-size:12.5px; color:var(--ink2); min-width:0; overflow-wrap:anywhere}
+.split b,.split i{font-family:"JetBrains Mono",monospace; font-size:12px; font-variant-numeric:tabular-nums;
+  text-align:right; white-space:nowrap; font-style:normal}
+.split b{font-weight:700; color:var(--kcal)}
+.split i{color:var(--ink3); font-weight:600}
+.split .tot{border-top:1px solid var(--line2); border-bottom:none; margin-top:2px; padding-top:8px}
+.split .tot span{font-family:Nunito,sans-serif; font-size:11.5px; font-weight:700; color:var(--ink)}
+.sub{margin-top:8px}
+.sub > summary{cursor:pointer; font-family:Nunito,sans-serif; font-size:11.5px; font-weight:700;
+  color:var(--kcal); list-style:none}
+.sub > summary::-webkit-details-marker{display:none}
+.sub > summary::before{content:"+ "}
+.sub[open] > summary::before{content:"− "}
+.sub .ing{margin-top:7px}
+.sub-h{margin:16px 0 7px; font-family:Nunito,sans-serif; font-size:10px; font-weight:700;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--ink3)}
+.sub-h:first-of-type{margin-top:2px}
 .notes{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px}
 .note-c{padding:14px; background:var(--soft); border:1px solid var(--line); border-radius:var(--r2)}
 .note-c h4{font-size:14px; font-weight:700; margin-bottom:5px}
@@ -489,6 +513,9 @@ summary::-webkit-details-marker{display:none}
   .meal-r{grid-column:1 / -1; justify-content:space-between; gap:8px}
   .macro-mini{gap:4px}
   .norms,.notes,.g2,.g3{grid-template-columns:minmax(0,1fr)}
+  .split > div{grid-template-columns:minmax(0,1fr) 60px 52px 52px; gap:5px}
+  .split b,.split i{font-size:11px}
+  .split span{font-size:12px}
   .rec-b{grid-template-columns:minmax(0,1fr); gap:14px}
   .rec-h{grid-template-columns:38px minmax(0,1fr) auto; gap:10px}
   .rec-h .mm{display:none}
@@ -581,6 +608,7 @@ const ICON = {
   wheat:'<path d="M12 21V9"/><path d="M12 9c0-2.5 2-4.5 4.5-4.5C16.5 7 14.5 9 12 9z"/><path d="M12 9C12 6.5 10 4.5 7.5 4.5 7.5 7 9.5 9 12 9z"/><path d="M12 15c0-2.2 1.8-4 4-4 0 2.2-1.8 4-4 4z"/><path d="M12 15c0-2.2-1.8-4-4-4 0 2.2 1.8 4 4 4z"/>',
   drop:'<path d="M12 3.5s5.5 6 5.5 9.6a5.5 5.5 0 1 1-11 0C6.5 9.5 12 3.5 12 3.5z"/>',
   leaf:'<path d="M20 4C10 4 4.5 8 4.5 14.5A5.5 5.5 0 0 0 10 20c6.5 0 10-5.5 10-16z"/><path d="M4.5 20C8 15 12 12.5 16 11"/>',
+  two:'<circle cx="9" cy="9.5" r="5.5"/><circle cx="15" cy="15" r="5.5"/>',
   chev:'<path d="m6 9 6 6 6-6"/>'
 ,
   sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
@@ -1632,7 +1660,7 @@ function dishSteps(){ return builtTpl ? stepsFor(builtTpl, built) : null; }
    на равный по калориям и белку. Замена живёт в браузере и отдельная
    для каждого человека — порции у них разные. */
 
-const swapKey = (di, mi) => who + '|' + PLAN.days[di].id + '.' + mi;
+const swapKey = (di, mi, k) => (k || who) + '|' + PLAN.days[di].id + '.' + mi;
 
 function parseQty(text){
   return String(text).split(', ').map(t => {
@@ -1657,11 +1685,12 @@ function scaleParts(parts, targetK){
 }
 
 /* что стоит в приёме сейчас: план или уже поставленная замена */
-function mealView(di, mi){
+function mealView(di, mi, k){
+  k = k || who;
   const m = PLAN.days[di].meals[mi];
-  const sw = swaps[swapKey(di, mi)];
+  const sw = swaps[swapKey(di, mi, k)];
   if(!sw || !sw.items || !sw.items.length){
-    const f = mealFactor(who, PLAN.days[di].id), v = m[who];
+    const f = mealFactor(k, PLAN.days[di].id), v = m[k];
     if(Math.abs(f - 1) < 0.005)
       return { title:m.title, note:m.note, label:m.label, qty:v.qty, v, swapped:false };
     return { title:m.title, note:m.note, label:m.label, swapped:false, scaled:true,
@@ -1675,12 +1704,96 @@ function mealView(di, mi){
     swapped: true, tplId: sw.tplId, items: sw.items, parts: sw.parts
   };
 }
-function dayTotals(di){
-  const dr = drinkTotals(who);
+function dayTotals(di, k){
+  k = k || who;
+  const dr = drinkTotals(k);
   return PLAN.days[di].meals.reduce((a, _, mi) => {
-    const v = mealView(di, mi).v;
+    const v = mealView(di, mi, k).v;
     a.k += v.k; a.p += v.p; a.f += v.f; a.c += v.c; return a;
   }, { k:Math.round(dr.k), p:Math.round(dr.p), f:Math.round(dr.f), c:Math.round(dr.c) });
+}
+
+/* ================= на двоих =================
+   Готовим один раз, а норм две. У плиты нужны два разных числа: сколько
+   продуктов взять всего — и сколько потом положить каждому. Складываем
+   навески обоих и сразу показываем, как делить готовое. */
+
+const RECIPE = {};
+PLAN.recipes.forEach(r => { RECIPE[r.key] = r; });
+
+/* Заготовки и «кухонные» продукты в кладовке конструктора не лежат,
+   а в навесках и рецептах стоят наравне со всеми. Здесь они находятся. */
+const BASE = PLAN.base || {};
+function anyFood(n){
+  const f = FOOD[n];
+  if(f) return f;
+  const r = RECIPE[n];
+  if(r) return { n, k:r.per100.k, p:r.per100.p, f:r.per100.f, c:r.per100.c, batch:true };
+  const b = BASE[n];
+  return b ? { n, k:b.k, p:b.p, f:b.f, c:b.c } : null;
+}
+function splitParts(text){
+  const out = [];
+  String(text).split(', ').forEach(t => {
+    const mm = t.match(/^(.*?)\s+(\d+(?:[.,]\d+)?)\s*(г|шт|мл)$/);
+    if(!mm) return;
+    const n = mm[1].trim(), f = anyFood(n), num = parseFloat(mm[2].replace(',', '.'));
+    out.push({ n, g: mm[3] === 'шт' ? num * ((f && f.unit) || 1) : num });
+  });
+  return out;
+}
+function partsOfMeal(di, mi, k){
+  const V = mealView(di, mi, k);
+  return { V, parts: (V.items && V.items.length)
+    ? V.items.map(x => ({ n:x.n, g:x.g, r:x.r })) : splitParts(V.qty) };
+}
+const gTxt = (n, g) => {
+  const f = anyFood(n);
+  return f && f.unit ? Math.round(g / f.unit) + ' шт' : Math.round(g) + ' г';
+};
+/* один приём на двоих: общий вес по каждому продукту и деление по тарелкам */
+function pairMeal(di, mi){
+  const A = partsOfMeal(di, mi, 'm'), B = partsOfMeal(di, mi, 'w');
+  const together = A.V.title === B.V.title && (A.V.tplId || '') === (B.V.tplId || '');
+  const map = new Map();
+  const add = (parts, key) => parts.forEach(x => {
+    const e = map.get(x.n) || { n:x.n, m:0, w:0 };
+    e[key] += x.g; map.set(x.n, e);
+  });
+  add(A.parts, 'm'); add(B.parts, 'w');
+  const rows = Array.from(map.values()).map(e => Object.assign(e, { g: e.m + e.w }));
+  const kk = A.V.v.k + B.V.v.k;
+  return { di, mi, A, B, rows, together, k:kk, share: kk > 0 ? Math.round(A.V.v.k / kk * 100) : 50 };
+}
+/* порядок готовки, пересчитанный на общий вес: одна сковорода на двоих */
+function pairSteps(P){
+  if(!P.together || !P.A.V.tplId || !P.A.V.items || !P.B.V.items) return null;
+  const used = [];
+  const merged = P.A.V.items.map(x => {
+    const i = P.B.V.items.findIndex((y, j) => y.n === x.n && y.r === x.r && used.indexOf(j) < 0);
+    if(i >= 0) used.push(i);
+    return Object.assign({}, x, { g: x.g + (i >= 0 ? P.B.V.items[i].g : 0) });
+  });
+  const st = stepsFor(dishById(P.A.V.tplId), merged);
+  return st && !st.broken ? st : null;
+}
+/* весь день одним списком: что достать из заготовок, что взвесить свежим */
+function pairDay(di){
+  const map = new Map();
+  PLAN.days[di].meals.forEach((_, mi) => pairMeal(di, mi).rows.forEach(r => {
+    const e = map.get(r.n) || { n:r.n, m:0, w:0, g:0 };
+    e.m += r.m; e.w += r.w; e.g += r.g; map.set(r.n, e);
+  }));
+  const all = Array.from(map.values()).sort((a, b) => b.g - a.g);
+  return { batch: all.filter(x => RECIPE[x.n]), fresh: all.filter(x => !RECIPE[x.n]) };
+}
+/* молоко в чашках — тоже общий расход, его удобно знать заранее */
+function pairDrinks(){
+  const a = drinkTotals('m'), b = drinkTotals('w');
+  if(!a.cups && !b.cups) return null;
+  const ml = k => (k.cups || 0) * (k.ml || 0), sg = k => (k.cups || 0) * (k.sug || 0);
+  return { cups:(a.cups || 0) + (b.cups || 0), ml:ml(a) + ml(b), sug:sg(a) + sg(b),
+           k:a.k + b.k, milk:a.milk || b.milk, a, b };
 }
 
 /* варианты замены под КБЖУ именно этого приёма */
@@ -2129,6 +2242,7 @@ function pageSearch(){
 const PAGES = [
   ['home','Обзор','home'],
   ['week','Неделя','week'],
+  ['pair','На двоих','two'],
   ['cons','Конструктор','plus'],
   ['recipes','Рецепты','book'],
   ['snacks','Перекусы','snack'],
@@ -2141,6 +2255,7 @@ const PAGES = [
 const SUBS = {
   home:'Нормы, недельная раскладка и принцип, по которому одна готовка кормит двоих',
   week:'Семь дней, 42 приёма пищи. Каждая навеска посчитана из рецептов',
+  pair:'Навески обоих сложены: сколько взять всего и сколько положить каждому',
   cons:'Соберите приём из того, что есть дома, или подправьте готовый под норму',
   recipes:'Все блюда конструктора и заготовки, которые готовятся впрок',
   snacks:'Взаимозаменяемые перекусы и ежедневный слот сладкого',
@@ -2154,7 +2269,7 @@ const SUBS = {
 /* ---------- рендер ---------- */
 function renderNav(){
   document.getElementById('nav').innerHTML = PAGES.map(([id,t,ic])=>{
-    const c = id==='week' ? PLAN.days.length : id==='cons' ? allFoods().length : id==='recipes' ? DISHES.length + PLAN.recipes.length
+    const c = id==='week' || id==='pair' ? PLAN.days.length : id==='cons' ? allFoods().length : id==='recipes' ? DISHES.length + PLAN.recipes.length
             : id==='snacks' ? PLAN.snacks.length+PLAN.sweets.length : id==='drinks' ? PLAN.drinks.length : '';
     return `<button type="button" data-page="${id}" aria-current="${id===page}">${svg(ic)}<span>${t}</span>${c?`<span class="count">${c}</span>`:''}</button>`;
   }).join('');
@@ -2331,6 +2446,91 @@ function pageWeek(){
   <div class="card sec">
     <div class="sec-h"><h2>Приёмы пищи</h2><span class="lbl">навеска для: ${person(who).name.toLowerCase()}</span></div>
     <div class="meals">${d.meals.map((m,mi) => mealRow(m, day, mi)).join('')}${drinkRow()}</div>
+    <p class="lead" style="margin:12px 0 0">Готовите сразу на двоих? Тогда эти навески нужно сложить с её — и знать, сколько потом положить каждому.</p>
+    <button type="button" class="btn btn-2" data-goto="pair" style="margin-top:9px">${svg('two')}Показать день на двоих</button>
+  </div>`;
+}
+
+const pairHead = '<div class="sh"><span>Продукт</span><b>Всего</b><i>Он</i><i>Она</i></div>';
+const pairRow = (r, cls) => `<div${cls ? ' class="' + cls + '"' : ''}><span>${esc(word(r.n))}</span>` +
+  `<b>${gTxt(r.n, r.g)}</b><i>${r.m ? gTxt(r.n, r.m) : '—'}</i><i>${r.w ? gTxt(r.n, r.w) : '—'}</i></div>`;
+
+function batchDetails(r){
+  const rc = RECIPE[r.n]; if(!rc) return '';
+  const f = r.g / (rc.outG || 1000);
+  return `<details class="sub"><summary>${esc(word(r.n))}: ${Math.round(r.g)} г — это ${Math.round(f * 100)}% закладки</summary>
+    <ul class="ing">${rc.ing.map(x => `<li>${esc(x.n)}<span>${Math.round(x.g * f)} г из ${esc(x.txt)}</span></li>`).join('')}</ul>
+    <p class="n" style="margin-top:7px">Готовится вся закладка сразу и живёт два дня. Граммы выше — только та доля, что уйдёт сегодня; варить отдельно столько смысла нет.</p>
+  </details>`;
+}
+
+function pairCard(P){
+  const V = P.A.V, cls = TAG[V.label] || 'tg-ghost', nm = TAGN[V.label] || V.label;
+  if(!P.together){
+    return `<div class="item">
+      <div class="meal-h"><h4>Разные блюда</h4><span class="tag ${cls}">${nm}</span><span class="swapped-tag">готовится отдельно</span></div>
+      <p class="q"><b>Он</b> · ${esc(P.A.V.title)}, ${nf(P.A.V.v.k)} ккал<br>${esc(P.A.V.qty)}</p>
+      <p class="q"><b>Она</b> · ${esc(P.B.V.title)}, ${nf(P.B.V.v.k)} ккал<br>${esc(P.B.V.qty)}</p>
+      <p class="n">Кто-то поставил замену на этот приём, складывать нечего. Вернуть общее блюдо можно в «Неделе» кнопкой «Вернуть как в плане».</p>
+    </div>`;
+  }
+  const st = pairSteps(P);
+  const batch = P.rows.filter(r => RECIPE[r.n]);
+  return `<div class="item">
+    <div class="meal-h"><h4>${esc(V.title)}</h4><span class="tag ${cls}">${nm}</span><span class="lbl">делится ${P.share} / ${100 - P.share}</span></div>
+    <div class="split">${pairHead}${P.rows.map(r => pairRow(r)).join('')}
+      <div class="tot"><span>Итого</span><b>${nf(P.k)} ккал</b><i>${nf(P.A.V.v.k)}</i><i>${nf(P.B.V.v.k)}</i></div>
+    </div>
+    ${st ? `<ol class="mini-steps" style="margin-top:9px">${st.steps.map(t => `<li>${esc(t)}</li>`).join('')}</ol>` : ''}
+    ${!st && V.note ? `<p class="n">${esc(V.note)}</p>` : ''}
+    ${batch.map(batchDetails).join('')}
+  </div>`;
+}
+
+function pagePair(){
+  const d = PLAN.days[day];
+  const tabs = PLAN.days.map((x, i) =>
+    `<button type="button" data-day="${i}" aria-pressed="${i === day}">${x.name.slice(0, 3)}${i === TODAY ? ' •' : ''}<i>${nf(dayTotals(i, 'm').k + dayTotals(i, 'w').k)}</i></button>`).join('');
+
+  const cards = d.meals.map((_, mi) => pairCard(pairMeal(day, mi)));
+  const tm = dayTotals(day, 'm'), tw = dayTotals(day, 'w');
+  const both = tm.k + tw.k, sh = Math.round(tm.k / both * 100);
+  const D = pairDay(day), dr = pairDrinks();
+  const apart = d.meals.filter((_, mi) => !pairMeal(day, mi).together).length;
+
+  return `
+  <div class="card pillbar">${tabs}</div>
+  <div class="card sec">
+    <div class="sec-h"><h2>${esc(d.name)}: одна готовка на двоих</h2><span class="lbl">${esc(d.sub)}</span></div>
+    <p class="lead" style="margin-bottom:14px">Готовим один раз, а норм две. Здесь навески обоих сложены: столбец «Всего» — сколько продуктов взять и положить в кастрюлю, два соседних — сколько потом раскладывать по тарелкам. Складываются только приёмы, где у вас одно и то же блюдо${apart ? '; сегодня ' + apart + ' идёт отдельно' : ''}.</p>
+    <div class="norm-out">
+      <div><span class="lbl">Всего за день</span><b>${nf(both)}</b> <s>ккал</s></div>
+      <div><span class="lbl">Ему</span><b>${nf(tm.k)}</b> <s>ккал</s></div>
+      <div><span class="lbl">Ей</span><b>${nf(tw.k)}</b> <s>ккал</s></div>
+      <div><span class="lbl">Пропорция</span><b>${sh} / ${100 - sh}</b> <s>ему / ей</s></div>
+      <div><span class="lbl">Белок на двоих</span><b>${Math.round(tm.p + tw.p)}</b> <s>г</s></div>
+    </div>
+    <p class="verdict v-ok" style="margin-top:12px">Разница между порциями — примерно ${Math.round((tm.k / Math.max(1, tw.k) - 1) * 100)}%. Это не «ему больше, потому что мужчина», а разные нормы: у него больше масса и глубже дефицит. Проще всего готовить общий вес и делить на глаз в этой пропорции, а белковую часть — по весам.</p>
+  </div>
+  <div class="card sec">
+    <div class="sec-h"><h2>Приёмы пищи</h2><span class="lbl">общий вес и как делить</span></div>
+    <div class="grid" style="gap:9px">${cards.join('')}</div>
+  </div>
+  <div class="card sec">
+    <div class="sec-h"><h2>Что достать и взвесить за день</h2><span class="lbl">всё сложено на двоих</span></div>
+    <p class="lead" style="margin-bottom:14px">Тот же расчёт, но одним списком: с этим удобно один раз подойти к холодильнику, а не бегать к нему четыре раза.</p>
+    ${D.batch.length ? `<h5 class="sub-h">Достать из заготовок</h5>
+      <div class="split">${pairHead}${D.batch.map(r => pairRow(r)).join('')}</div>
+      ${D.batch.map(batchDetails).join('')}` : ''}
+    ${D.fresh.length ? `<h5 class="sub-h">Взвесить сегодня</h5>
+      <div class="split">${pairHead}${D.fresh.map(r => pairRow(r)).join('')}</div>` : ''}
+    ${dr ? `<h5 class="sub-h">Напитки</h5>
+      <div class="split">
+        ${pairHead}
+        <div><span>${esc(word(dr.milk || 'молоко 2,5%'))} в чашки</span><b>${Math.round(dr.ml)} мл</b><i>${Math.round((dr.a.cups || 0) * (dr.a.ml || 0)) || '—'}</i><i>${Math.round((dr.b.cups || 0) * (dr.b.ml || 0)) || '—'}</i></div>
+        ${dr.sug ? `<div><span>сахар в чашки</span><b>${Math.round(dr.sug)} г</b><i>${Math.round((dr.a.cups || 0) * (dr.a.sug || 0)) || '—'}</i><i>${Math.round((dr.b.cups || 0) * (dr.b.sug || 0)) || '—'}</i></div>` : ''}
+        <div class="tot"><span>Чашек за день</span><b>${dr.cups}</b><i>${dr.a.cups || '—'}</i><i>${dr.b.cups || '—'}</i></div>
+      </div>` : ''}
   </div>`;
 }
 
@@ -2486,7 +2686,7 @@ function rail(){
   </div>`;
 }
 
-const RENDER = {home:pageHome, week:pageWeek, cons:pageCons, profile:pageProfile, drinks:pageDrinks, recipes:pageRecipes, snacks:pageSnacks, cook:pageCook, shop:pageShop, notes:pageNotes};
+const RENDER = {home:pageHome, week:pageWeek, pair:pagePair, cons:pageCons, profile:pageProfile, drinks:pageDrinks, recipes:pageRecipes, snacks:pageSnacks, cook:pageCook, shop:pageShop, notes:pageNotes};
 
 function render(){
   renderNav(); renderWho();
@@ -2509,6 +2709,8 @@ function render(){
 document.addEventListener('click', e=>{
   const nb = e.target.closest('#nav button');
   if(nb){ page = nb.dataset.page; render(); window.scrollTo({top:0,behavior:'smooth'}); return; }
+  const gt = e.target.closest('[data-goto]');
+  if(gt){ page = gt.dataset.goto; clearQuery(); render(); window.scrollTo({top:0,behavior:'smooth'}); return; }
   const sb = e.target.closest('[data-who]');
   if(sb){ who = sb.dataset.who; store.set('kotel.who',who); render(); return; }
   const gr = e.target.closest('[data-g]');
@@ -2595,7 +2797,7 @@ document.addEventListener('click', e=>{
   const rb = e.target.closest('[data-recipe]');
   if(rb){ openRec = +rb.dataset.recipe; page = 'recipes'; clearQuery(); render(); window.scrollTo({top:0,behavior:'smooth'}); return; }
   const db = e.target.closest('[data-day]');
-  if(db){ day = +db.dataset.day; page = 'week'; clearQuery(); render(); window.scrollTo({top:0,behavior:'smooth'}); return; }
+  if(db){ day = +db.dataset.day; if(page !== 'pair') page = 'week'; clearQuery(); render(); window.scrollTo({top:0,behavior:'smooth'}); return; }
 });
 function clearQuery(){
   query = '';
