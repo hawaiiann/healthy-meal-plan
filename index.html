@@ -815,6 +815,20 @@ let edQ = '';         /* то же для приёма */
    границы применяются при сохранении, а не на каждой клавише. */
 let typed = null;                     /* { id, text } — поле под курсором */
 const shown = (id, v) => (typed && typed.id === id) ? esc(typed.text) : v;
+/* Поля веса — текстовые, а не type="number": число не отдаёт selectionStart
+   и бросает на setSelectionRange, поэтому после перерисовки каретка падала
+   в начало поля и «440» набиралось как «044». Заодно приходится самим
+   отсеивать всё, что числом не является. */
+function numField(el){
+  const clean = String(el.value).replace(/[^\d.,]/g, '');
+  if(clean !== el.value){
+    const p = Math.max(0, (el.selectionStart || 0) - 1);
+    el.value = clean;
+    try { el.setSelectionRange(p, p); } catch(err){}
+  }
+  const v = parseFloat(clean.replace(',', '.'));
+  return isNaN(v) || v < 0 ? 0 : v;
+}
 function keepCaret(el){
   typed = { id: el.id, text: el.value };
   const pos = el.selectionStart, id = el.id;
@@ -2595,7 +2609,7 @@ function pageCons(){
     const f = FOOD[x.n], v = { k: f.k*x.g/100, p: f.p*x.g/100, f: f.f*x.g/100, c: f.c*x.g/100 };
     return `<div class="comp">
       <span><h5>${esc(x.n)}</h5><span class="s">${f.unit ? x.g+' г · ' : ''}${Math.round(v.k)} ккал · Б ${v.p.toFixed(1)} · Ж ${v.f.toFixed(1)} · У ${v.c.toFixed(1)}</span></span>
-      <span class="g"><button type="button" data-g="${i}:-">−</button><input id="cg_${i}" type="number" min="0" max="${f.unit ? 20 : 2000}" step="${f.unit ? 1 : 5}" value="${shown('cg_' + i, f.unit ? Math.round(x.g/f.unit) : x.g)}"><s>${f.unit ? 'шт' : 'г'}</s><button type="button" data-g="${i}:+">+</button></span>
+      <span class="g"><button type="button" data-g="${i}:-">−</button><input id="cg_${i}" type="text" inputmode="decimal" value="${shown('cg_' + i, f.unit ? Math.round(x.g/f.unit) : x.g)}"><s>${f.unit ? 'шт' : 'г'}</s><button type="button" data-g="${i}:+">+</button></span>
       <button type="button" class="del" data-g="${i}:x" aria-label="Убрать ${esc(x.n)}">${svg('x')}</button>
     </div>`;
   };
@@ -3236,7 +3250,7 @@ function editPanel(di, mi){
     const v = sumOf([{ n:x.n, g:x.g }]);
     return `<div class="comp${x.off ? ' off' : ''}">
       <span><h5>${esc(word(x.n))}</h5><span class="s">${x.off ? 'не учитывается' : Math.round(v.k) + ' ккал · Б ' + v.p.toFixed(1) + ' · Ж ' + v.f.toFixed(1) + ' · У ' + v.c.toFixed(1)}</span></span>
-      <span class="g"><input id="ed_${i}" type="number" min="0" max="${unit ? 20 : 2000}" step="${unit ? 1 : 5}"
+      <span class="g"><input id="ed_${i}" type="text" inputmode="decimal"
         value="${x.off ? '' : shown('ed_' + i, inUnits(x.n, x.g))}"${x.off ? ' disabled' : ''}><s>${unit ? 'шт' : 'г'}</s></span>
       <button type="button" class="del" data-edoff="${i}" aria-pressed="${x.off}" aria-label="${x.off ? 'Вернуть' : 'Не учитывать'} ${esc(word(x.n))}">${svg(x.off ? 'plus' : 'x')}</button>
     </div>`;
@@ -3615,7 +3629,7 @@ function recPanel(r){
     const f = anyFood(x.n), unit = f && f.unit, v = sumOf([{ n:x.n, g:x.g }]);
     return `<div class="comp">
       <span><h5>${esc(word(x.n))}</h5><span class="s">${Math.round(v.k)} ккал · Б ${v.p.toFixed(1)} · Ж ${v.f.toFixed(1)} · У ${v.c.toFixed(1)}</span></span>
-      <span class="g"><input id="rg_${i}" type="number" min="0" max="${unit ? 40 : 5000}" step="${unit ? 1 : 10}" value="${shown('rg_' + i, inUnits(x.n, x.g))}"><s>${unit ? 'шт' : 'г'}</s></span>
+      <span class="g"><input id="rg_${i}" type="text" inputmode="decimal" value="${shown('rg_' + i, inUnits(x.n, x.g))}"><s>${unit ? 'шт' : 'г'}</s></span>
       <button type="button" class="del" data-rgoff="${i}" aria-label="Убрать ${esc(word(x.n))}">${svg('x')}</button>
     </div>`;
   }).join('');
@@ -3640,7 +3654,7 @@ function recPanel(r){
       : `<p class="s" style="font-size:11.5px;color:var(--ink3)">Ничего не нашлось${qq ? ' по запросу «' + esc(recQ) + '»' : ''}. Без запроса показаны продукты, отмеченные дома.</p>`}
     <div class="aim" style="margin-top:10px">
       <div class="aim-row"><span>Навеска сырого</span><b>${nf(mass)} г</b></div>
-      <div class="aim-row"><span>Выход готового</span><b><input id="rout" type="number" min="50" max="9000" step="50" value="${shown('rout', Math.round(d.outG))}"> г</b></div>
+      <div class="aim-row"><span>Выход готового</span><b><input id="rout" type="text" inputmode="decimal" value="${shown('rout', Math.round(d.outG))}"> г</b></div>
       <div class="aim-row"><span>Было на 100 г</span><b>${was.per100.k} ккал · Б ${num(was.per100.p)} · Ж ${num(was.per100.f)} · У ${num(was.per100.c)}</b></div>
       <div class="aim-row"><span>Станет на 100 г</span><b>${now.per100.k} ккал · Б ${num(now.per100.p)} · Ж ${num(now.per100.f)} · У ${num(now.per100.c)}</b></div>
       <div class="aim-row"><span>В меню</span><b>${used ? mealsWord(used) + (dk ? ', сдвиг ' + (dk > 0 ? '+' : '−') + Math.abs(dk) + ' ккал на 100 г' : ', калорийность та же') : 'эта заготовка в меню не стоит'}</b></div>
@@ -4069,32 +4083,28 @@ document.addEventListener('input', e=>{
   if(/^cg_\d+$/.test(e.target.id)){
     const i = +e.target.id.slice(3), it = built[i];
     if(it){
-      const v = parseFloat(String(e.target.value).replace(',', '.'));
       const f = FOOD[it.n];
-      it.g = isNaN(v) || v < 0 ? 0 : Math.round(v * ((f && f.unit) || 1));
+      it.g = Math.round(numField(e.target) * ((f && f.unit) || 1));
       keepCaret(e.target);
     }
     return;
   }
   if(/^ed_\d+$/.test(e.target.id) && editDraft){
     const i = +e.target.id.slice(3);
-    const v = parseFloat(String(e.target.value).replace(',', '.'));
-    editDraft[i].g = isNaN(v) || v < 0 ? 0 : Math.round(v * stepOf(editDraft[i].n));
+    editDraft[i].g = Math.round(numField(e.target) * stepOf(editDraft[i].n));
     keepCaret(e.target);
     return;
   }
   if(/^rg_\d+$/.test(e.target.id) && recDraft){
     const i = +e.target.id.slice(3), it = recDraft.ing[i];
     if(it){
-      const v = parseFloat(String(e.target.value).replace(',', '.'));
-      it.g = isNaN(v) || v < 0 ? 0 : Math.round(v * stepOf(it.n));
+      it.g = Math.round(numField(e.target) * stepOf(it.n));
       keepCaret(e.target);
     }
     return;
   }
   if(e.target.id === 'rout' && recDraft){
-    const v = parseFloat(String(e.target.value).replace(',', '.'));
-    recDraft.outG = isNaN(v) || v < 0 ? 0 : Math.round(v);
+    recDraft.outG = Math.round(numField(e.target));
     keepCaret(e.target);
     return;
   }

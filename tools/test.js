@@ -1731,6 +1731,29 @@ const probe = `
   else if (recEdit['плов'].outG !== Math.round(rr0.outG / 2)) { np++; console.log('  сохранился не тот выход:', recEdit['плов'].outG); }
   if (RECIPE['плов'].per100.k < rr0.per100.k * 1.8) { np++; console.log('  половинный выход не удвоил плотность'); }
   recEdit = {}; recKey = null; recDraft = null; rebuildRecipes();
+
+  // поля веса — текстовые: input type=number не отдаёт selectionStart и
+  // бросает на setSelectionRange, каретка после перерисовки падала в начало
+  editOpen(0, 0);
+  const hf = pageWeek();
+  const fld = id => { const at = hf.indexOf(id); return at < 0 ? '' : hf.slice(at, at + 120); };
+  for (const id of ['id="ed_0"']) {
+    const m2 = fld(id);
+    if (!m2) { np++; console.log('  не нашлось поле', id); }
+    else if (m2.indexOf('type="text"') < 0 || m2.indexOf('inputmode=') < 0) { np++; console.log('  поле не текстовое:', id); }
+  }
+  editKey = null; editDraft = null;
+  recKey = 'плов'; recDraft = { ing: ORIG['плов'].ing.map(x => ({ n:x.n, g:x.g })), outG: ORIG['плов'].outG };
+  const hf2 = pageRecipes();
+  for (const id of ['id="rg_0"', 'id="rout"']) {
+    const at2 = hf2.indexOf(id), m3 = at2 < 0 ? '' : hf2.slice(at2, at2 + 120);
+    if (!m3) { np++; console.log('  не нашлось поле', id); }
+    else if (m3.indexOf('type="text"') < 0 || m3.indexOf('inputmode=') < 0) { np++; console.log('  поле не текстовое:', id); }
+  }
+  recKey = null; recDraft = null;
+  // мусор в поле не должен становиться весом
+  // в шаблоне обратный слэш не доживает до кода — класс пишем цифрами
+  if (String('12абв').replace(/[^0-9.,]/g, '') !== '12') { np++; console.log('  чистка поля от букв не работает'); }
   console.log('проблем с вводом чисел:', np);
   }
 
