@@ -334,7 +334,7 @@ button{font:inherit; color:inherit; border:none; background:none; cursor:pointer
 
 /* ---------- строки приёмов ---------- */
 .meals{display:flex; flex-direction:column; gap:9px}
-.meal{display:grid; grid-template-columns:52px minmax(0,1fr) auto; gap:14px; align-items:center; padding:12px 14px; background:var(--soft); border:1px solid var(--line); border-radius:var(--r2)}
+.meal{display:grid; grid-template-columns:52px minmax(0,1fr) auto; gap:14px; align-items:start; padding:12px 14px; background:var(--soft); border:1px solid var(--line); border-radius:var(--r2)}
 .meal:hover{border-color:var(--line2)}
 .meal-h{display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-bottom:3px}
 .meal-h h4{font-size:15px; font-weight:700}
@@ -459,9 +459,12 @@ summary::-webkit-details-marker{display:none}
 .sub > summary::before{content:"+ "}
 .sub[open] > summary::before{content:"− "}
 .sub .ing{margin-top:7px}
+.sub .n{font-size:11.5px; color:var(--ink3); font-style:italic; line-height:1.45}
 .sub-h{margin:16px 0 7px; font-family:Nunito,sans-serif; font-size:10px; font-weight:700;
   letter-spacing:.1em; text-transform:uppercase; color:var(--ink3)}
 .sub-h:first-of-type{margin-top:2px}
+.meal .qty em.src{font-style:normal; font-family:Nunito,sans-serif; font-size:10px; font-weight:700;
+  letter-spacing:.08em; text-transform:uppercase; color:var(--ink3); margin-right:4px}
 .comp.off{opacity:.55}
 .comp.off h5{text-decoration:line-through}
 .comp .g input{width:62px; padding:5px 7px; border-radius:7px; border:1px solid var(--line2); background:var(--card);
@@ -3171,6 +3174,24 @@ function drinkRow(){
     </div>
   </div>`;
 }
+/* «лазанья 455 г, капуста 115 г, помидор 95 г, масло 4 г» читается как
+   один состав, и первый вопрос — где фарш. А это две разные вещи:
+   заготовка, внутри которой фарш и есть, и салат рядом с ней. Разводим
+   их по строкам и даём раскрыть состав заготовки. */
+function qtySplit(V){
+  const parts = (V.items && V.items.length) ? V.items.map(x => ({ n:x.n, g:x.g })) : splitParts(V.qty);
+  const pieces = String(V.qty).split(', ').length;
+  /* хлеб печётся впрок, но в приёме он всегда рядом, а не «из заготовки»:
+     иначе яичница с тостом выглядит как блюдо из хлеба с яйцом сбоку */
+  const main = x => RECIPE[x.n] && x.n !== 'хлеб';
+  const batch = parts.filter(main);
+  const rest = parts.filter(x => !main(x));
+  /* если разбор потерял часть строки — показываем как есть, без выдумок */
+  return { batch, rest, all: parts.filter(x => RECIPE[x.n]),
+           ok: batch.length > 0 && parts.length === pieces };
+}
+const qtyLine = list => list.map(x => esc(word(x.n)) + ' ' + gOf(x)).join(', ');
+
 function mealRow(m, di, mi){
   const V = mealView(di, mi), v = V.v, cls = TAG[V.label] || 'tg-ghost', nm = TAGN[V.label] || V.label;
   const key = di + '.' + mi, open = openSwap === key;
@@ -3179,8 +3200,13 @@ function mealRow(m, di, mi){
     ${donut(v.p,v.f,v.c,44,7)}
     <div>
       <div class="meal-h"><h4>${esc(V.title)}</h4><span class="tag ${cls}">${nm}</span>${V.swapped ? '<span class="swapped-tag">замена</span>' : ''}</div>
-      <p class="qty">${esc(V.qty)}</p>
+      ${(() => {
+        const sp = qtySplit(V);
+        if(!sp.ok) return `<p class="qty">${esc(V.qty)}</p>`;
+        return `<p class="qty"><em class="src">Из заготовки:</em> ${qtyLine(sp.batch)}${sp.rest.length ? '<br><em class="src">Рядом:</em> ' + qtyLine(sp.rest) : ''}</p>`;
+      })()}
       ${V.note ? `<p class="note">${esc(V.note)}</p>` : ''}
+      ${qtySplit(V).all.map(x => batchDetails({ n:x.n, g:x.g }, 1)).join('')}
       ${st && !st.broken ? `<ol class="mini-steps" style="margin-top:6px">${st.steps.map(t => `<li>${esc(t)}</li>`).join('')}</ol>` : ''}
     </div>
     <div class="meal-r">
@@ -3268,7 +3294,7 @@ function batchDetails(r, m){
     : Math.round(f * 100) + '% закладки';
   return `<details class="sub"><summary>${esc(word(r.n))}: ${nf(g)} г — это ${part}</summary>
     <ul class="ing">${rc.ing.map(x => `<li>${esc(x.n)}<span>${Math.round(x.g * f)} г из ${esc(x.txt)}</span></li>`).join('')}</ul>
-    <p class="n" style="margin-top:7px">Готовится вся закладка сразу и живёт два дня. Граммы выше — только та доля, что уйдёт ${k > 1 ? 'за эти два дня' : 'сегодня'}; варить отдельно столько смысла нет.</p>
+    <p class="n" style="margin-top:7px">Готовится вся закладка сразу и живёт два дня. Граммы выше — только та доля, что уйдёт ${k > 1 ? 'за эти два дня' : 'в этот приём'}; варить отдельно столько смысла нет.</p>
   </details>`;
 }
 

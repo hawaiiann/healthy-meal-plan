@@ -1421,6 +1421,73 @@ const probe = `
   console.log('проблем с правкой навески:', ed2);
   }
 
+  { // заготовка и то, что рядом с ней
+  let qs = 0;
+  profiles = {}; swaps = {}; custom = []; rebuildFood(); who = 'm'; day = 0;
+  gymDays = PLAN.days.map(d => !!d.gym);
+
+  let withBatch = 0;
+  for (let di = 0; di < PLAN.days.length; di++) {
+    for (let mi = 0; mi < PLAN.days[di].meals.length; mi++) {
+      const V = mealView(di, mi), sp = qtySplit(V);
+      // разбор ничего не теряет
+      if (sp.ok) {
+        withBatch++;
+        if (sp.batch.length + sp.rest.length !== String(V.qty).split(', ').length) {
+          qs++; console.log('  разбор потерял часть строки:', PLAN.days[di].name, V.label);
+        }
+        for (const x of sp.batch) if (!RECIPE[x.n]) { qs++; console.log('  не заготовка в заготовках:', x.n); }
+        for (const x of sp.batch) if (x.n === 'хлеб') { qs++; console.log('  хлеб попал в заготовки:', PLAN.days[di].name); }
+        // калории обеих частей вместе дают приём
+        const both = sumOf(sp.batch.concat(sp.rest));
+        if (Math.abs(both.k - V.v.k) > Math.max(5, V.v.k * 0.02)) {
+          qs++; console.log('  части не дают приём:', PLAN.days[di].name, V.label, Math.round(both.k), V.v.k);
+        }
+      }
+    }
+  }
+  if (withBatch < 10) { qs++; console.log('  приёмов с заготовкой подозрительно мало:', withBatch); }
+
+  // разметка приёма: подпись и раскрытие состава
+  day = 4;   // пятница, лазанья на ужин
+  const hw2 = pageWeek();
+  if (hw2.indexOf('Из заготовки:') < 0) { qs++; console.log('  нет подписи «Из заготовки»'); }
+  if (hw2.indexOf('Рядом:') < 0) { qs++; console.log('  нет подписи «Рядом»'); }
+  if (hw2.indexOf('закладки') < 0) { qs++; console.log('  нет раскрытия состава заготовки'); }
+  if (hw2.indexOf('фарш куриный') < 0) { qs++; console.log('  в раскрытии лазаньи нет фарша'); }
+  if (bad(hw2).length) { qs++; console.log('  ПРОБЛЕМА отрисовки недели:', bad(hw2).join(',')); }
+
+  // приём без заготовки показывается как есть
+  {
+    let plainSeen = false;
+    for (let di = 0; di < PLAN.days.length && !plainSeen; di++) {
+      for (let mi = 0; mi < PLAN.days[di].meals.length; mi++) {
+        const V = mealView(di, mi);
+        if (qtySplit(V).ok) continue;
+        plainSeen = true;
+        day = di;
+        if (pageWeek().indexOf(esc(V.qty)) < 0) { qs++; console.log('  обычный приём потерял строку навески:', V.title); }
+        break;
+      }
+    }
+    if (!plainSeen) { qs++; console.log('  не нашлось ни одного приёма без заготовки'); }
+  }
+
+  // после замены на блюдо конструктора заготовок нет и подпись не появляется
+  {
+    day = 4; who = 'm';
+    const O2 = swapOptions(4, 4);
+    if (O2.dishes.length) {
+      applySwap(4, 4, { title:'тест', tplId:O2.dishes[0].tpl.id, items:O2.dishes[0].items });
+      const V = mealView(4, 4);
+      if (qtySplit(V).ok) { qs++; console.log('  у собранного блюда нашлась заготовка'); }
+      dropSwap(4, 4);
+    }
+  }
+  day = 0;
+  console.log('проблем с разбором приёма:', qs);
+  }
+
   console.log('сегодня по календарю: индекс ' + TODAY + ' -> ' + PLAN.days[TODAY].name);
 })();
 `;
