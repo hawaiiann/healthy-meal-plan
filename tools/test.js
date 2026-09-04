@@ -697,6 +697,66 @@ const probe = `
   console.log('проблем с готовкой ×2:', x2);
   }
 
+  { // границы параметров и живучесть на удалённых продуктах
+  let sf = 0;
+  profiles = {}; swaps = {}; custom = []; rebuildFood(); who = 'm';
+
+  // 1. форма режет опасный ввод и говорит об этом
+  const origGet = document.getElementById;
+  const feed = v => { document.getElementById = id => (id in v ? { value: v[id] } : origGet(id)); };
+  feed({ pf_sex:'m', pf_age:'31', pf_h:'175', pf_wt:'90', pf_act:'1.375', pf_def:'80', pf_gk:'9' });
+  saveProfile();
+  document.getElementById = origGet;
+  const Pc = person('m');
+  if (profiles.m.def !== 30) { sf++; console.log('  дефицит не ограничен:', profiles.m.def); }
+  if (profiles.m.gk !== 2.5) { sf++; console.log('  белок на кг не ограничен:', profiles.m.gk); }
+  if (!profileNote) { sf++; console.log('  про урезание не сказано'); }
+  if (Pc.kcal < 1000) { sf++; console.log('  норма всё равно провалилась:', Pc.kcal); }
+  if (pageProfile().indexOf('безопасных границ') < 0) { sf++; console.log('  предупреждения нет в разметке'); }
+
+  // 2. профиль из браузера мимо формы тоже санируется
+  profiles.m = { sex:'m', age:9, h:400, wt:600, act:9, def:90, gk:12, fk:9 };
+  const Pw = calcNorm(profiles.m);
+  if (Pw) {
+    if (Pw.kcal <= 0) { sf++; console.log('  норма ушла в ноль'); }
+    if (Pw.carb < 0) { sf++; console.log('  углеводы отрицательные'); }
+    if (Pw.prot * 4 + Pw.fat * 9 > Pw.kcal) { sf++; console.log('  белок и жир не влезают в норму'); }
+    if (Pw.prot / 600 > 2.5 + 0.01) { sf++; console.log('  белок сверх границы:', Pw.prot); }
+  }
+
+  // 3. норма и то, что даёт меню, показаны рядом
+  profiles.m = { sex:'m', age:31, h:175, wt:110, act:1.375, def:25, gk:1.8, fk:0.9 };
+  const gg = planGives('m'), nn = calcNorm(profiles.m);
+  if (!(gg.k > 0) || !(gg.p > 0)) { sf++; console.log('  меню не посчиталось'); }
+  if (Math.abs(gg.k - nn.kcal) > nn.kcal * 0.05) { sf++; console.log('  калории меню разошлись с нормой:', Math.round(gg.k), nn.kcal); }
+  const hp = pageProfile();
+  if (hp.indexOf('Норма и что даёт меню') < 0) { sf++; console.log('  нет таблицы «норма и меню»'); }
+  if (Math.abs(gg.p - nn.prot) > nn.prot * 0.12 && hp.indexOf('не поспевает') < 0) {
+    sf++; console.log('  расхождение по белку есть, а предупреждения нет');
+  }
+  if (bad(hp).length) { sf++; console.log('  ПРОБЛЕМА отрисовки параметров:', bad(hp).join(',')); }
+  profiles = {};
+
+  // 4. удалённый свой продукт не роняет расчёты
+  custom = [{ n:'тестовый сыр', cat:'Молочное', k:300, p:20, f:24, c:1, unit:0, mine:true }];
+  rebuildFood(); pantry['тестовый сыр'] = true;
+  who = 'm'; day = 0;
+  applySwap(0, 2, { title:'тест', tplId:null, items:[
+    { n:'тестовый сыр', g:100, flex:true, lo:5, hi:300 },
+    { n:'филе куриное', g:150, flex:true, lo:5, hi:300 }
+  ] });
+  custom = []; rebuildFood(); purgeFood('тестовый сыр');
+  const left = (swaps[swapKey(0, 2, 'm')] || { items: [] }).items.map(x => x.n);
+  if (left.indexOf('тестовый сыр') >= 0) { sf++; console.log('  удалённый продукт остался в замене'); }
+  for (const [nm, fn] of [['mealView', () => mealView(0, 2)], ['pairMeal', () => pairMeal(0, 2)],
+                          ['pagePair', () => pagePair()], ['pageWeek', () => pageWeek()],
+                          ['syncDay', () => syncDay(0)], ['twinOf', () => twinOf([{ n:'нет такого', g:100 }], 200)]]) {
+    try { fn(); } catch (e) { sf++; console.log('  ПАДАЕТ ' + nm + ':', e.message); }
+  }
+  swaps = {}; delete pantry['тестовый сыр'];
+  console.log('проблем с границами и живучестью:', sf);
+  }
+
   console.log('сегодня по календарю: индекс ' + TODAY + ' -> ' + PLAN.days[TODAY].name);
 })();
 `;

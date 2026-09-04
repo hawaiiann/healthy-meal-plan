@@ -732,6 +732,7 @@ let consNote = '';
 let aimMeal = 'Обед';
 let consPair = store.get('kotel.conspair', true) !== false;
 let syncNote = '';
+let profileNote = '';
 /* Готовка впрок: варим двойной объём, а по тарелкам раскладываем то же
    самое. Множитель трогает только столбец «сколько готовить» и порядок
    готовки — навеска на человека остаётся его нормой. */
@@ -802,15 +803,23 @@ const ACT = [
   [1.465, 'Сидячая работа, 4–5 тренировок'],
   [1.55,  'Активный день или 6 тренировок']
 ];
+const CLAMP = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 function calcNorm(p){
   if(!p || !(p.wt > 25) || !(p.h > 100) || !(p.age > 10)) return null;
-  const bmr  = 10 * p.wt + 6.25 * p.h - 5 * p.age + (p.sex === 'm' ? 5 : -161);
-  const tdee = bmr * (p.act || 1.375);
-  const kcal = Math.round(tdee * (1 - (p.def || 12) / 100) / 5) * 5;
-  const prot = Math.round(p.wt * (p.gk || 1.8));
-  const fat  = Math.round(p.wt * (p.fk || 0.9));
-  const carb = Math.max(0, Math.round((kcal - prot * 4 - fat * 9) / 4));
-  return { bmr:Math.round(bmr), tdee:Math.round(tdee), kcal, prot, fat, carb };
+  /* границы держим и здесь: в браузере мог остаться профиль, сохранённый
+     до того, как поля стали ограничивать ввод */
+  const wt  = CLAMP(p.wt, 35, 250), h = CLAMP(p.h, 120, 220), age = CLAMP(p.age, 14, 90);
+  const bmr  = 10 * wt + 6.25 * h - 5 * age + (p.sex === 'm' ? 5 : -161);
+  const tdee = bmr * CLAMP(p.act || 1.375, 1.2, 1.9);
+  const kcal = Math.round(tdee * (1 - CLAMP(p.def || 12, 5, 30) / 100) / 5) * 5;
+  const prot = Math.round(wt * CLAMP(p.gk || 1.8, 1.2, 2.5));
+  const fat  = Math.round(wt * CLAMP(p.fk || 0.9, 0.6, 1.5));
+  /* белок и жир не должны съедать весь бюджет: если съели — режем жир,
+     иначе карточка нормы показывает ноль углеводов и делает вид, что так и надо */
+  let fat2 = fat;
+  if(prot * 4 + fat2 * 9 > kcal * 0.9) fat2 = Math.max(Math.round(wt * 0.6), Math.round((kcal * 0.9 - prot * 4) / 9));
+  const carb = Math.max(0, Math.round((kcal - prot * 4 - fat2 * 9) / 4));
+  return { bmr:Math.round(bmr), tdee:Math.round(tdee), kcal, prot, fat:fat2, carb };
 }
 /* норма человека: своя, если параметры заданы, иначе базовая из плана */
 function person(k){
@@ -879,7 +888,9 @@ function sumOf(list){
   }, {k:0, p:0, f:0, c:0});
 }
 function roundG(f, g){
-  if(f.unit) return Math.max(f.unit, Math.round(g / f.unit) * f.unit);
+  /* продукт мог исчезнуть из базы: свой продукт удалили, а замена на него
+     осталась. Округляем как обычный весовой, а не падаем на f.unit. */
+  if(f && f.unit) return Math.max(f.unit, Math.round(g / f.unit) * f.unit);
   return Math.max(5, Math.round(g / 5) * 5);
 }
 function have(cat){ return allFoods().filter(f => f.cat === cat && pantry[f.n]); }
@@ -1939,6 +1950,21 @@ function applySwap(di, mi, data){
   store.set('kotel.swaps', swaps);
   openSwap = null;
 }
+/* Свой продукт удалён — вычищаем его из уже поставленных замен, иначе
+   в приёме остаётся строка без КБЖУ, а пересчёт порции второму падает. */
+function purgeFood(n){
+  let touched = false;
+  for(const key of Object.keys(swaps)){
+    const sw = swaps[key];
+    if(!sw || !sw.items) continue;
+    const left = sw.items.filter(x => x.n !== n);
+    if(left.length === sw.items.length) continue;
+    touched = true;
+    if(left.length) sw.items = left; else delete swaps[key];
+  }
+  if(touched) store.set('kotel.swaps', swaps);
+}
+
 function dropSwap(di, mi){
   delete swaps[swapKey(di, mi)];
   store.set('kotel.swaps', swaps);
@@ -2131,15 +2157,28 @@ function saveProfile(){
   const val = id => (document.getElementById(id) || {}).value || '';
   const num = id => { const v = parseFloat(String(val(id)).replace(',', '.')); return isNaN(v) ? 0 : v; };
   const p = Object.assign({}, profiles[who] || {});
+  /* Опечатка в одном поле превращает план в голодание молча: 8 вместо 18%
+     дефицита никак себя не проявит, а 80 — даст 500 ккал в день. Поэтому
+     режем по границам и говорим, что именно урезали. */
+  const lim = [];
+  const cut = (v, lo, hi, name, unit) => {
+    const c = Math.min(hi, Math.max(lo, v));
+    if(Math.abs(c - v) > 0.001) lim.push(name + ' — ' + String(c).replace('.', ',') + unit);
+    return c;
+  };
   p.sex = val('pf_sex') || (who === 'm' ? 'm' : 'w');
-  p.age = Math.round(num('pf_age'));
-  p.h   = Math.round(num('pf_h'));
-  p.wt  = Math.round(num('pf_wt') * 10) / 10;
+  const age = Math.round(num('pf_age')), h = Math.round(num('pf_h')), wt = Math.round(num('pf_wt') * 10) / 10;
+  p.age = age > 0 ? cut(age, 14, 90, 'возраст', ' лет') : age;
+  p.h   = h  > 0 ? cut(h, 120, 220, 'рост', ' см') : h;
+  p.wt  = wt > 0 ? cut(wt, 35, 250, 'вес', ' кг') : wt;
   p.act = num('pf_act') || 1.375;
   const def = num('pf_def'), gk = num('pf_gk');
-  p.def = def > 0 ? def : 12;
-  p.gk  = gk > 0 ? gk : 1.8;
+  p.def = cut(def > 0 ? def : 12, 5, 30, 'дефицит', '%');
+  p.gk  = cut(gk > 0 ? gk : 1.8, 1.2, 2.5, 'белок', ' г/кг');
   p.fk  = p.fk || 0.9;
+  profileNote = lim.length
+    ? 'Поправлено до безопасных границ: ' + lim.join(', ') + '. Глубже дефицит и выше белок на дефиците смысла не имеют, а вреда приносят достаточно.'
+    : '';
   if(!calcNorm(p)){ profiles[who] = p; store.set('kotel.profiles', profiles); render(); return; }
   /* журнал: пишем, только если вес поменялся или записи ещё нет */
   const hist = (p.hist || []).slice();
@@ -2177,6 +2216,19 @@ function saveFood(){
     ? '?Сохранил, но сверьтесь: по макросам выходит ' + Math.round(calc) + ' ккал, а вы указали ' + Math.round(k) + '. Считать буду по вашей цифре.'
     : '';
   render();
+}
+
+/* Навески в меню масштабируются по калориям — значит белок и жир едут
+   следом, а не следуют за своей нормой. При сильном отклонении веса от
+   базового это расходится, и лучше показать разницу, чем прятать. */
+function planGives(k){
+  const a = { k:0, p:0, f:0, c:0 };
+  for(let d = 0; d < PLAN.days.length; d++){
+    const t = dayTotals(d, k);
+    a.k += t.k; a.p += t.p; a.f += t.f; a.c += t.c;
+  }
+  const n = PLAN.days.length;
+  return { k:a.k / n, p:a.p / n, f:a.f / n, c:a.c / n };
 }
 
 function pageProfile(){
@@ -2236,8 +2288,28 @@ function pageProfile(){
       <div><span class="lbl">Жиры</span><b>${n.fat}</b> <s>г</s></div>
       <div><span class="lbl">Углеводы</span><b>${n.carb}</b> <s>г</s></div>
     </div>
+    ${(() => {
+      const g = planGives(who);
+      const row = (nm, want, got, unit) => {
+        const d = Math.round(got - want);
+        return `<div><span>${nm}</span><b>${nf(want)} ${unit}</b><i>${nf(got)}</i><i>${d > 0 ? '+' : d < 0 ? '−' : ''}${Math.abs(d) || 0}</i></div>`;
+      };
+      const dp = g.p - n.prot, bad = Math.abs(dp) > n.prot * 0.12;
+      return `<h5 class="sub-h" style="margin-top:16px">Норма и что даёт меню</h5>
+      <div class="split">
+        <div class="sh"><span>За день</span><b>Норма</b><i>Меню</i><i>±</i></div>
+        ${row('Калории', n.kcal, g.k, 'ккал')}
+        ${row('Белок', n.prot, g.p, 'г')}
+        ${row('Жиры', n.fat, g.f, 'г')}
+        ${row('Углеводы', n.carb, g.c, 'г')}
+      </div>
+      <p class="verdict ${bad ? 'v-warn' : 'v-ok'}" style="margin-top:10px">${bad
+        ? 'Навески в меню пересчитываются по калориям, а белок за ними не поспевает: меню даёт ' + nf(g.p) + ' г при вашей цели ' + n.prot + ' г. ' + (dp < 0 ? 'Добавьте белковый перекус — творог, греческий йогурт или протеин на воде.' : 'Столько белка не нужно: замените один белковый перекус фруктом или гарниром.')
+        : 'Меню держится вашей нормы: калории и белок сходятся, жиры и углеводы гуляют в пределах раскладки дня.'}</p>`;
+    })()}
     <p class="verdict ${Math.abs(scaleOf(who) - 1) > 0.12 ? 'v-warn' : 'v-ok'}" style="margin-top:12px">
-      Базовая норма плана — ${nf(base.kcal)} ккал. Ваша — ${nf(n.kcal)}, это ${scaleOf(who) >= 1 ? '+' : '−'}${Math.abs(Math.round((scaleOf(who) - 1) * 100))}%. На столько же пересчитаны все навески в меню.</p>`
+      Базовая норма плана — ${nf(base.kcal)} ккал. Ваша — ${nf(n.kcal)}, это ${scaleOf(who) >= 1 ? '+' : '−'}${Math.abs(Math.round((scaleOf(who) - 1) * 100))}%. На столько же пересчитаны все навески в меню.</p>
+    ${profileNote ? `<p class="verdict v-warn" style="margin-top:10px">${esc(profileNote)}</p>` : ''}`
     : '<p class="verdict v-warn" style="margin-top:12px">Заполните возраст, рост и вес — без них формула не считает. Пока действует базовая норма плана: ' + nf(base.kcal) + ' ккал.</p>'}
   </div>
   ${hist.length ? `<div class="card sec">
@@ -2894,6 +2966,7 @@ document.addEventListener('click', e=>{
     custom = custom.filter(f => f.n !== n);
     delete pantry[n];
     built = built.filter(x => x.n !== n);
+    purgeFood(n);
     store.set('kotel.custom', custom); store.set('kotel.pantry', pantry);
     rebuildFood(); render(); return;
   }
