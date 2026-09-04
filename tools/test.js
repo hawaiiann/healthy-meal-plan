@@ -985,6 +985,94 @@ const probe = `
   console.log('проблем с дневником питания:', ee);
   }
 
+  { // новые продукты и быстрые блюда
+  let np = 0;
+  profiles = {}; swaps = {}; custom = []; rebuildFood(); who = 'm';
+  for (const f of allFoods()) pantry[f.n] = true;
+
+  for (const n of ['макароны гот.', 'пудинг молочный']) {
+    if (!FOOD[n]) { np++; console.log('  нет продукта в кладовке:', n); }
+  }
+  if (!anyFood('макароны тв. сухие')) { np++; console.log('  сухих макарон нет в базе'); }
+  if (!PLAN.recipes.some(r => r.key === 'болоньезе')) { np++; console.log('  нет заготовки болоньезе'); }
+  if (!PLAN.sweets.some(x => x.title.indexOf('Пудинг') >= 0)) { np++; console.log('  пудинга нет в сладком'); }
+
+  // сухая навеска макарон меньше готовой примерно вдвое
+  {
+    const x = { n:'макароны гот.', g:225 };
+    const d = parseFloat(dry(x));
+    if (!(d > 80 && d < 120)) { np++; console.log('  сухая навеска макарон посчитана странно:', dry(x)); }
+  }
+
+  aimMeal = 'Обед';
+  for (const id of ['pastameat', 'pastatuna', 'pastamush', 'soupnoodle', 'chickpot']) {
+    const r = assembleDish('Обед', id);
+    if (!r) { np++; console.log('  блюдо не собирается:', id); continue; }
+    const v = sumOf(r.items), aim = aimFor('Обед');
+    if (Math.abs(v.k - aim.k) > aim.k * 0.12) { np++; console.log('  мимо калорий:', id, Math.round(v.k), 'из', aim.k); }
+    const st = stepsFor(r.tpl, r.items);
+    if (!st || st.broken) { np++; console.log('  порядок готовки не собрался:', id); continue; }
+    for (const line of st.steps) {
+      if (/undefined|NaN/.test(line)) { np++; console.log('  дыра в шаге:', id, line); }
+      /* «на растительным маслом» — типичная ошибка падежа после предлога */
+      if (/ на [а-яё]+ым | на [а-яё]+ом маслом/.test(line)) { np++; console.log('  падеж после предлога:', id, line); }
+    }
+  }
+  console.log('проблем с новыми блюдами:', np);
+  }
+
+  { // поиск блюда по кладовке в панели замены
+  let ss = 0;
+  profiles = {}; swaps = {}; who = 'm'; swapQ = '';
+  pantry = {};
+  for (const f of PLAN.foods) if (f.on) pantry[f.n] = true;
+
+  const h = swapPanel(0, 2);
+  const cnt = x => (h.match(x) || []).length;
+  if (!cnt(/data-swapdish/g)) { ss++; console.log('  ничего не собирается из базовой кладовки'); }
+  if (!cnt(/class="near"/g)) { ss++; console.log('  нет списка «почти хватает»'); }
+  if (h.indexOf('id="swq"') < 0) { ss++; console.log('  нет поля поиска в панели замены'); }
+  if (bad(h).length) { ss++; console.log('  ПРОБЛЕМА отрисовки панели замены:', bad(h).join(',')); }
+
+  // «почти хватает» называет именно недостающее
+  {
+    const t2 = DISHES.find(x => x.id === 'pastatuna');
+    pantry['тунец с/с'] = false;
+    const need = dishNeeds(t2);
+    if (need.indexOf('тунец с/с') < 0) { ss++; console.log('  недостающий продукт не назван:', need.join(',')); }
+    pantry['тунец с/с'] = true;
+    if (dishNeeds(t2).length) { ss++; console.log('  блюдо просит продуктов, хотя всё есть'); }
+  }
+
+  // поиск по названию блюда, продукту и технике
+  const found = q => { swapQ = q; const x = swapPanel(0, 2); return (x.match(/data-swapdish/g) || []).length; };
+  const all = found('');
+  if (found('паста') >= all) { ss++; console.log('  фильтр по блюду не сужает список'); }
+  if (!found('макароны')) { ss++; console.log('  поиск по продукту ничего не нашёл'); }
+  if (!found('духовка')) { ss++; console.log('  поиск по технике ничего не нашёл'); }
+  if (found('такогопродуктанет')) { ss++; console.log('  бессмысленный запрос что-то нашёл'); }
+  swapQ = 'такогопродуктанет';
+  if (swapPanel(0, 2).indexOf('ничего не собирается') < 0) { ss++; console.log('  пустой результат не объяснён'); }
+  swapQ = '';
+
+  // выбранное блюдо действительно встаёт в приём
+  {
+    const meal = PLAN.days[0].meals[2], aim = { k: meal.m.k, p: meal.m.p };
+    const r = assembleDish('Обед', 'pastameat', aim);
+    if (!r) { ss++; console.log('  выбранное блюдо не собралось'); }
+    else {
+      applySwap(0, 2, { title:'тест пасты', tplId:'pastameat', items: r.items.map(x => ({ n:x.n, g:x.g, r:x.r, side:!!x.side })) });
+      const V = mealView(0, 2);
+      if (!V.swapped || V.tplId !== 'pastameat') { ss++; console.log('  замена не встала'); }
+      if (Math.abs(V.v.k - aim.k) > aim.k * 0.15) { ss++; console.log('  замена мимо калорий приёма:', V.v.k, aim.k); }
+      dropSwap(0, 2);
+    }
+  }
+  swaps = {};
+  for (const f of allFoods()) pantry[f.n] = true;
+  console.log('проблем с поиском замены:', ss);
+  }
+
   console.log('сегодня по календарю: индекс ' + TODAY + ' -> ' + PLAN.days[TODAY].name);
 })();
 `;

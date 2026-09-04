@@ -462,6 +462,14 @@ summary::-webkit-details-marker{display:none}
 .sub-h{margin:16px 0 7px; font-family:Nunito,sans-serif; font-size:10px; font-weight:700;
   letter-spacing:.1em; text-transform:uppercase; color:var(--ink3)}
 .sub-h:first-of-type{margin-top:2px}
+.swq{width:100%; padding:8px 11px; margin-bottom:9px; border-radius:9px; border:1px solid var(--line-c);
+  background:var(--field); color:var(--ink); font-size:12.5px; font-family:inherit}
+.swq::placeholder{color:var(--ink3)}
+.near{display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:6px 0;
+  border-bottom:1px dotted var(--line2); font-size:12.5px}
+.near:last-child{border-bottom:none}
+.near b{font-weight:700; color:var(--ink2)}
+.near span{font-size:11.5px; color:var(--ink3); white-space:nowrap}
 .notes{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px}
 .note-c{padding:14px; background:var(--soft); border:1px solid var(--line); border-radius:var(--r2)}
 .note-c h4{font-size:14px; font-weight:700; margin-bottom:5px}
@@ -516,6 +524,10 @@ summary::-webkit-details-marker{display:none}
   .meal-r{grid-column:1 / -1; justify-content:space-between; gap:8px}
   .macro-mini{gap:4px}
   .norms,.notes,.g2,.g3{grid-template-columns:minmax(0,1fr)}
+  /* на телефоне «почти хватает» встаёт в две строки: иначе название блюда
+     ломается посреди слова, лишь бы уместить список покупок в одну строку */
+  .near{flex-direction:column; align-items:flex-start; gap:2px}
+  .near span{white-space:normal}
   .split > div{grid-template-columns:minmax(0,1fr) 60px 52px 52px; gap:5px}
   .split b,.split i{font-size:11px}
   .split span{font-size:12px}
@@ -737,6 +749,7 @@ let aimMeal = 'Обед';
 let consPair = store.get('kotel.conspair', true) !== false;
 let syncNote = '';
 let outNote = null;   /* кончившийся продукт и что с ним делать */
+let swapQ = '';       /* фильтр по блюдам и продуктам в панели замены */
 
 /* Дневник съеденного. План есть, факта нет — и через месяц непонятно,
    почему вес стоит: то ли план не работает, то ли по нему никто не жил.
@@ -1054,6 +1067,8 @@ const WORD = {
   'сыр лёгкий':['лёгкий сыр','лёгким сыром'], 'творожный сыр':['творожный сыр','творожным сыром'],
   'сметана 15%':['сметана','сметаной'], 'протеин':['протеин','протеином'],
   'рис гот.':['отварной рис','отварным рисом'], 'гречка гот.':['отварная гречка','отварной гречкой'],
+  'макароны гот.':['отварные макароны','отварными макаронами'], 'макароны тв. сухие':['макароны','макаронами'],
+  'пудинг молочный':['пудинг','пудингом'],
   'булгур гот.':['отварной булгур','отварным булгуром'], 'перловка гот.':['отварная перловка','отварной перловкой'],
   'картофель отв.':['отварной картофель','отварным картофелем'], 'нут отв.':['отварной нут','отварным нутом'],
   'хлопья овсяные':['овсяные хлопья','овсяными хлопьями'], 'хлеб':['хлеб','хлебом'], 'хлебец':['хлебцы','хлебцами'],
@@ -1403,6 +1418,89 @@ const DISHES = [
       `Заложить: ${q(S.cab)} шинкованную${S.sauce ? ', ' + q(S.sauce) : ''}. Кажется, что не влезет — влезет: капуста ужаривается вдвое.`,
       'Полстакана воды, тмин, соль. Режим «Тушение» — 40 минут.',
       S.grn ? `Гарнир: ${q(S.grn)}.` : 'На второй день вкуснее.'
+    ] },
+
+
+  /* Дальше — самое дешёвое и быстрое: макароны твёрдых сортов, банка тунца,
+     картошка с курицей. Всё это готовится в одну кастрюлю и стоит копейки,
+     а по белку вытягивается за счёт фарша, тунца и лёгкого сыра. Навеска
+     макарон в шагах пересчитана в сухие: варить-то придётся именно их. */
+  { id:'pastameat', short:'Паста с фаршем', title:'Паста с {main:1} и томатом', meals:['Обед','Ужин'], gear:'сковорода + кастрюля', time:'20 минут',
+    slots:[
+      {r:'main', only:MEAT, base:130, lo:70, hi:260, req:true, flex:true},
+      {r:'pasta', only:['макароны гот.'], base:180, lo:80, hi:340, req:true, flex:true},
+      {r:'tom', only:['томатная паста','помидор'], base:60, lo:20, hi:220, flex:true},
+      {r:'veg', only:['лук','морковь','шампиньоны'], base:80, lo:40, hi:170, flex:true},
+      {r:'chs', only:['сыр лёгкий'], base:20, lo:10, hi:45, flex:true},
+      {r:'oil', only:['масло раст.'], base:7, lo:4, hi:12}
+    ],
+    steps:S=>[
+      `Поставить воду. Макарон нужно ${dry(S.pasta)} сухими — это и есть ${gOf(S.pasta)} готовых.`,
+      S.veg ? `${cap(q(S.veg))} мелким кубиком, обжарить${S.oil ? ' с ' + qi(S.oil) : ''} — 4 минуты.` : `Разогреть сковороду${S.oil ? ' с ' + qi(S.oil) : ''}.`,
+      `Добавить ${qi(S.main)}, разбивать лопаткой до рассыпчатости — 8 минут. Комки потом не разойдутся.`,
+      S.tom ? `${cap(q(S.tom))}, полстакана воды от макарон, орегано. 7 минут без крышки, пока не загустеет.` : 'Посолить, поперчить, влить полстакана воды от макарон.',
+      `Откинуть макароны недоваренными на минуту и домешать прямо в соус${S.chs ? ', сверху ' + q(S.chs) : ''}.`
+    ] },
+
+  { id:'pastatuna', short:'Паста с тунцом', title:'Паста с тунцом и помидорами', meals:['Обед','Ужин'], gear:'кастрюля', time:'15 минут',
+    slots:[
+      {r:'main', only:['тунец с/с'], base:120, lo:60, hi:220, req:true, flex:true},
+      {r:'pasta', only:['макароны гот.'], base:180, lo:80, hi:340, req:true, flex:true},
+      {r:'tom', only:['помидор','томатная паста'], base:120, lo:40, hi:250, flex:true},
+      {r:'veg', only:['лук','перец сладкий','шампиньоны'], base:70, lo:40, hi:150, flex:true},
+      {r:'oil', only:['масло раст.'], base:6, lo:3, hi:12}
+    ],
+    steps:S=>[
+      `Сварить макароны: ${dry(S.pasta)} сухими дадут ${gOf(S.pasta)} готовых.`,
+      S.veg ? `${cap(q(S.veg))}${S.oil ? ' с ' + qi(S.oil) : ''} — 3 минуты, только до мягкости.` : `Прогреть сковороду${S.oil ? ' с ' + qi(S.oil) : ''}.`,
+      S.tom ? `${cap(q(S.tom))} нарезать и потушить 5 минут.` : 'Влить полстакана воды от макарон.',
+      `${cap(q(S.main))} слить и размять вилкой, вмешать в конце — тунец уже готов, ему нужно только прогреться.`
+    ] },
+
+  { id:'pastamush', short:'Паста с грибами', title:'Паста с грибами и лёгким сыром', meals:['Обед','Ужин'], gear:'сковорода + кастрюля', time:'20 минут',
+    slots:[
+      {r:'main', only:['шампиньоны'], base:200, lo:100, hi:350, req:true, flex:true},
+      {r:'pasta', only:['макароны гот.'], base:180, lo:80, hi:340, req:true, flex:true},
+      {r:'chs', only:['сыр лёгкий','творожный сыр'], base:35, lo:15, hi:70, req:true, flex:true},
+      {r:'milk', only:['молоко 1,5%','молоко 2,5%'], base:80, lo:40, hi:150, flex:true},
+      {r:'veg', only:['лук'], base:60, lo:30, hi:120, flex:true},
+      {r:'oil', only:['масло раст.'], base:6, lo:3, hi:12}
+    ],
+    steps:S=>[
+      `Макароны: ${dry(S.pasta)} сухими — ${gOf(S.pasta)} готовых.`,
+      `${cap(q(S.main))} пластинками на сухую сковороду, пока не уйдёт вода, и только потом добавить ${S.oil ? q(S.oil) : 'масло'}${S.veg ? ' и ' + q(S.veg) : ''} — иначе грибы варятся, а не жарятся.`,
+      S.milk ? `${cap(q(S.milk))} и ${q(S.chs)}, помешивать до однородного соуса — 3 минуты.` : `${cap(q(S.chs))} и полстакана воды от макарон, размешать до соуса.`,
+      'Домешать макароны в соус, дать постоять минуту — соус загустеет сам.'
+    ] },
+
+  { id:'soupnoodle', short:'Куриный суп с макаронами', title:'Куриный суп с макаронами', meals:['Обед'], gear:'кастрюля', time:'25 минут',
+    slots:[
+      {r:'main', only:['филе куриное','фарш куриный','фарш индейки'], base:150, lo:80, hi:260, req:true, flex:true},
+      {r:'pasta', only:['макароны гот.'], base:120, lo:50, hi:250, req:true, flex:true},
+      {r:'veg', only:['морковь'], base:80, lo:40, hi:150, flex:true},
+      {r:'veg2', only:['картофель отв.'], base:120, lo:50, hi:250, flex:true},
+      {r:'veg3', only:['лук'], base:60, lo:30, hi:110, flex:true}
+    ],
+    steps:S=>[
+      `${cap(q(S.main))} нарезать кубиком, залить холодной водой, довести и снять пену.`,
+      S.veg2 ? `Через 10 минут — ${q(S.veg2)}${S.veg ? ' и ' + q(S.veg) : ''}${S.veg3 ? ' и ' + q(S.veg3) : ''}.` : `Через 10 минут — ${q(S.veg || S.veg3)}.`,
+      `Макароны кинуть за 7 минут до конца: ${dry(S.pasta)} сухими. Разварятся — суп превратится в кашу к завтрашнему дню.`,
+      'Лавровый лист, перец горошком. Зелень уже в тарелку.'
+    ] },
+
+  { id:'chickpot', short:'Курица с картошкой', title:'{main} с картошкой из духовки', meals:['Обед','Ужин'], gear:'духовка', time:'45 минут, из них 10 активных',
+    slots:[
+      {r:'main', only:['филе куриное','бедро куриное б/к'], base:160, lo:90, hi:280, req:true, flex:true},
+      {r:'pot', only:['картофель отв.'], base:200, lo:80, hi:380, req:true, flex:true},
+      {r:'veg', only:['морковь','лук','перец сладкий','кабачок'], base:100, lo:50, hi:200, flex:true},
+      {r:'chs', only:['сыр лёгкий'], base:20, lo:10, hi:45, flex:true},
+      {r:'oil', only:['масло раст.'], base:8, lo:4, hi:14}
+    ],
+    steps:S=>[
+      `${cap(q(S.pot))} крупными дольками${S.veg ? ', ' + q(S.veg) + ' — тоже крупно' : ''}. Мелкая нарезка высохнет раньше, чем приготовится курица.`,
+      `${cap(q(S.main))} кусками с овощами в одну форму${S.oil ? ', полить ' + qi(S.oil) : ''}, паприка, чеснок, соль.`,
+      '200 °C, 35 минут под фольгой.',
+      S.chs ? `Снять фольгу, ${q(S.chs)} сверху и ещё 8 минут до корочки.` : 'Снять фольгу и ещё 8 минут до корочки.'
     ] },
 
   { id:'tunarice', short:'Рис с тунцом', title:'Рис с тунцом и горошком', meals:['Обед','Ужин'], gear:'без техники', time:'10 минут',
@@ -1825,6 +1923,14 @@ function stepsFor(tpl, items){
   try { return { title: tpl.title.replace(/\{(\w+)(?::(\d))?\}/g, (_, r, c) => S[r] ? word(S[r].n, c ? +c : 0) : ''), steps: tpl.steps(S) }; }
   catch(e){ return { broken:true }; }
 }
+/* В кладовке лежат «макароны гот.», а варить придётся сухие: их вдвое с
+   лишним меньше по весу. Показываем в шагах именно сухую навеску. */
+const dry = x => {
+  if(!x) return '';
+  const f = FOOD[x.n], d = anyFood('макароны тв. сухие');
+  if(!f || !d || !d.k) return gOf(x);
+  return Math.round(f.k * x.g / d.k / 5) * 5 + ' г';
+};
 const dishById = id => DISHES.find(t => t.id === id) || null;
 function dishSteps(){ return builtTpl ? stepsFor(builtTpl, built) : null; }
 
@@ -2781,6 +2887,30 @@ function optRow(title, sub, k, data){
     <span><h5>${esc(title)}</h5><span class="s">${esc(sub)}</span></span>
     <span class="kk">${nf(k)}</span></button>`;
 }
+/* Чего не хватает, чтобы блюдо вообще собралось: пустые обязательные роли
+   и продукты, которыми они закрываются. */
+function dishNeeds(t){
+  const need = [];
+  for(const sl of t.slots){
+    if(!sl.req || slotPool(sl).length) continue;
+    const want = (sl.only || []).filter(n => FOOD[n]);
+    need.push(want.length ? want[0] : (sl.cat || 'продукт'));
+  }
+  return need;
+}
+/* Все продукты, которые блюдо вообще может попросить — по ним и ищем. */
+function dishFoods(t){
+  const out = [];
+  for(const sl of t.slots) for(const n of (sl.only || [])) out.push(n);
+  return out;
+}
+function dishHit(t, qq){
+  if(!qq) return true;
+  const hay = (t.short + ' ' + t.title + ' ' + t.gear + ' ' +
+    dishFoods(t).map(n => n + ' ' + word(n)).join(' ')).toLowerCase();
+  return hay.indexOf(qq) >= 0;
+}
+
 function swapPanel(di, mi){
   const O = swapOptions(di, mi);
   const cur = mealView(di, mi);
@@ -2807,6 +2937,30 @@ function swapPanel(di, mi){
              Math.round(sumOf(items).k),
              { di, mi, title: O.split[0].title + ' + ' + O.split[1].title, items }) + '</div>';
   }
+  /* Поиск по кладовке: что ещё соберётся прямо сейчас и что почти
+     собирается — с точным списком, чего для этого не хватает. */
+  {
+    const m0 = PLAN.days[di].meals[mi];
+    const lab = (m0.label === 'Вечер' || m0.label === 'Перекус') ? 'Перекус' : m0.label;
+    const qq = swapQ.trim().toLowerCase();
+    const pool = DISHES.filter(t => t.meals.indexOf(lab) >= 0 && dishHit(t, qq));
+    const ready = pool.filter(t => dishFits(t) && minKcal(t) <= O.aim.k * 1.05);
+    const near = pool.filter(t => !dishFits(t))
+      .map(t => ({ t, need: dishNeeds(t) }))
+      .filter(x => x.need.length && x.need.length <= 2)
+      .sort((a, b) => a.need.length - b.need.length)
+      .slice(0, 6);
+    out += `<div class="swp-g"><span class="lbl">Собрать из того, что есть<i></i></span>
+      <input id="swq" class="swq" type="search" placeholder="Блюдо или продукт: паста, тунец, духовка" value="${esc(swapQ)}">
+      ${ready.length
+        ? `<div class="dish-pick" style="padding:0">${ready.map(t => `<button type="button" data-swapdish="${di}.${mi}.${t.id}">${esc(t.short)}</button>`).join('')}</div>`
+        : `<p class="s" style="font-size:11.5px;color:var(--ink3)">Из отмеченного дома под этот приём ничего не собирается${qq ? ' по запросу «' + esc(swapQ) + '»' : ''}. Отметьте больше продуктов в конструкторе.</p>`}
+      ${near.length
+        ? `<span class="lbl" style="margin-top:10px">Почти хватает<i></i></span>${near.map(x => `<div class="near"><b>${esc(x.t.short)}</b><span>купить: ${x.need.map(n => esc(word(n))).join(', ')}</span></div>`).join('')}`
+        : ''}
+    </div>`;
+  }
+
   const parts = cur.items ? cur.items : parseQty(cur.qty);
   const subLines = parts.map(x => {
     const alts = subsFor(x.n, x.g);
@@ -3269,8 +3423,33 @@ document.addEventListener('click', e=>{
     if(!r) consNote = 'Из отмеченных продуктов не собирается ни одно блюдо для этого приёма. Отметьте больше — хотя бы мясо или творог, овощ и гарнир.';
     render(); return;
   }
+  const sdh = e.target.closest('[data-swapdish]');
+  if(sdh){
+    const [d0, m0, id] = sdh.dataset.swapdish.split('.');
+    const di0 = +d0, mi0 = +m0, meal = PLAN.days[di0].meals[mi0];
+    const lab = (meal.label === 'Вечер' || meal.label === 'Перекус') ? 'Перекус' : meal.label;
+    const aim = { k: meal[who].k, p: meal[who].p };
+    let best = null;
+    for(let t = 0; t < 40; t++){
+      const r = assembleDish(lab, id, aim);
+      if(!r) continue;
+      const v = sumOf(r.items), miss = Math.abs(v.k - aim.k) / aim.k;
+      if(!best || miss < best.miss) best = { r, miss };
+      if(miss < 0.05) break;
+    }
+    if(best){
+      const st = stepsFor(best.r.tpl, best.r.items);
+      applySwap(di0, mi0, {
+        title: st && !st.broken ? cap(st.title) : best.r.tpl.short,
+        tplId: best.r.tpl.id,
+        items: best.r.items.map(x => ({ n:x.n, g:x.g, r:x.r, side:!!x.side }))
+      });
+      openSwap = null; swapQ = '';
+    }
+    render(); return;
+  }
   const sb2 = e.target.closest('[data-swap]');
-  if(sb2){ const k = sb2.dataset.swap; openSwap = openSwap === k ? null : k; render(); return; }
+  if(sb2){ const k = sb2.dataset.swap; swapQ = ''; openSwap = openSwap === k ? null : k; render(); return; }
   if(e.target.closest('[data-swapclose]')){ openSwap = null; render(); return; }
   const un = e.target.closest('[data-undo]');
   if(un){ const [di,mi] = un.dataset.undo.split('.').map(Number); dropSwap(di,mi); openSwap = null; render(); return; }
@@ -3346,6 +3525,14 @@ function clearQuery(){
 }
 document.addEventListener('input', e=>{
   if(e.target.id === 'q'){ query = e.target.value; render(); }
+  if(e.target.id === 'swq'){
+    swapQ = e.target.value;
+    const pos = e.target.selectionStart;
+    render();
+    /* панель перерисовалась целиком — возвращаем курсор в поле */
+    const el = document.getElementById('swq');
+    if(el){ el.focus(); try { el.setSelectionRange(pos, pos); } catch(err){} }
+  }
 });
 document.addEventListener('change', e=>{
   if(e.target.id === 'aimSel'){ aimMeal = e.target.value; consNote = ''; render(); return; }
