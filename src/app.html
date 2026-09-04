@@ -997,13 +997,44 @@ function energyParts(p, wt){
   return { bmr, life, gym, walk, tdee: life + gym + walk };
 }
 const CLAMP = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+/* Формула Миффлина — гипотеза с разбросом ±15%, и спорить с весами она не
+   может. Если дневник и журнал веса перекрываются, поддержку можно не
+   угадывать, а посчитать: сколько съедено минус то, что ушло массой.
+   7 700 ккал на килограмм — обычная оценка для смешанной ткани; точность
+   тут не в третьем знаке, а в том, что это ваши цифры, а не средние. */
+const KCAL_PER_KG = 7700;
+function factTdee(k){
+  k = k || who;
+  const p = profiles[k] || {};
+  const hist = (p.hist || []).slice().sort((a, b) => a.d < b.d ? -1 : 1);
+  if(hist.length < 2) return { ok:false, why:'weight' };
+  const a = hist[0], b = hist[hist.length - 1];
+  const days = Math.round((new Date(b.d) - new Date(a.d)) / 86400000);
+  if(days < 10) return { ok:false, why:'short', days };
+  /* берём только те дни дневника, что попали между взвешиваниями */
+  const back = CLAMP(Math.round((Date.now() - new Date(a.d)) / 86400000) + 1, 1, 120);
+  const inside = eatStats(k, back).days.filter(x => x.date >= a.d && x.date <= b.d);
+  const need = Math.max(7, Math.round(days * 0.5));
+  if(inside.length < need) return { ok:false, why:'diary', days, have:inside.length, need };
+  const avg = inside.reduce((t, x) => t + x.k, 0) / inside.length;
+  const dw = b.wt - a.wt;
+  const tdee = avg - dw * KCAL_PER_KG / days;
+  const bmr = energyParts(p, CLAMP(p.wt || b.wt, 35, 250)).bmr;
+  /* вода гуляет на пару килограммов, и на коротком окне это даёт поддержку
+     вроде 900 или 5 000 ккал. Такое не показываем, а говорим почему. */
+  if(tdee < bmr || tdee > bmr * 2.6) return { ok:false, why:'wild', tdee, bmr, days, dw, avg };
+  return { ok:true, days, marked:inside.length, avg, dw, tdee, from:a, to:b };
+}
 function calcNorm(p){
   if(!p || !(p.wt > 25) || !(p.h > 100) || !(p.age > 10)) return null;
   /* границы держим и здесь: в браузере мог остаться профиль, сохранённый
      до того, как поля стали ограничивать ввод */
   const wt  = CLAMP(p.wt, 35, 250), h = CLAMP(p.h, 120, 220), age = CLAMP(p.age, 14, 90);
   const E = energyParts(p, wt);
-  const bmr = E.bmr, tdee = E.tdee;
+  const bmr = E.bmr;
+  /* если поддержку посчитали по весам, формула ей больше не указ:
+     она не знает ни вашего обмена, ни того, как вы двигаетесь на самом деле */
+  const tdee = p.tdeeFix > 0 ? CLAMP(p.tdeeFix, bmr, bmr * 2.6) : E.tdee;
   const kcal = Math.round(tdee * (1 - CLAMP(p.def || 12, 5, 30) / 100) / 5) * 5;
   const prot = Math.round(wt * CLAMP(p.gk || 1.8, 1.2, 2.5));
   const fat  = Math.round(wt * CLAMP(p.fk || 0.9, 0.6, 1.5));
@@ -1013,6 +1044,7 @@ function calcNorm(p){
   if(prot * 4 + fat2 * 9 > kcal * 0.9) fat2 = Math.max(Math.round(wt * 0.6), Math.round((kcal * 0.9 - prot * 4) / 9));
   const carb = Math.max(0, Math.round((kcal - prot * 4 - fat2 * 9) / 4));
   return { bmr:Math.round(bmr), tdee:Math.round(tdee), kcal, prot, fat:fat2, carb,
+           tdeeCalc:Math.round(E.tdee), byFact: !!(p.tdeeFix > 0),
            life:Math.round(E.life), gym:Math.round(E.gym), walk:Math.round(E.walk) };
 }
 /* норма человека: своя, если параметры заданы, иначе базовая из плана */
@@ -2766,7 +2798,7 @@ function saveDrinks(){
 function saveProfile(){
   const val = id => (document.getElementById(id) || {}).value || '';
   const num = id => { const v = parseFloat(String(val(id)).replace(',', '.')); return isNaN(v) ? 0 : v; };
-  const p = Object.assign({}, profiles[who] || {});
+  const p = Object.assign({}, profiles[who] || {});   /* tdeeFix переносится вместе с остальным */
   /* Опечатка в одном поле превращает план в голодание молча: 8 вместо 18%
      дефицита никак себя не проявит, а 80 — даст 500 ккал в день. Поэтому
      режем по границам и говорим, что именно урезали. */
@@ -2964,7 +2996,8 @@ function pageProfile(){
       <div><span class="lbl">Быт</span><b>${nf(n.life)}</b> <s>ккал</s></div>
       <div><span class="lbl">Зал</span><b>+${nf(n.gym)}</b> <s>ккал/день</s></div>
       <div><span class="lbl">Прогулки</span><b>+${nf(n.walk)}</b> <s>ккал/день</s></div>
-      <div><span class="lbl">Поддержка</span><b>${nf(n.tdee)}</b> <s>ккал</s></div>
+      ${n.byFact ? `<div><span class="lbl">По формуле</span><b>${nf(n.tdeeCalc)}</b> <s>ккал</s></div>` : ''}
+      <div><span class="lbl">Поддержка</span><b>${nf(n.tdee)}</b> <s>${n.byFact ? 'ккал · по весам' : 'ккал'}</s></div>
       <div><span class="lbl">Норма</span><b>${nf(n.kcal)}</b> <s>ккал</s></div>
       <div><span class="lbl">Белок</span><b>${n.prot}</b> <s>г</s></div>
       <div><span class="lbl">Жиры</span><b>${n.fat}</b> <s>г</s></div>
@@ -3014,6 +3047,41 @@ function pageProfile(){
       </div>
       <p class="verdict ${share >= 80 ? 'v-ok' : 'v-warn'}" style="margin-top:12px">${verdict}</p>
     </div>`;
+  })()}
+  ${(() => {
+    const F = factTdee(who), fix = (profiles[who] || {}).tdeeFix;
+    const head = `<div class="card sec"><div class="sec-h"><h2>Поддержка по факту</h2><span class="lbl">дневник × весы</span></div>`;
+    const why = {
+      weight: 'Нужны хотя бы два взвешивания — впишите вес сегодня и повторите через пару недель.',
+      short: 'Между первым и последним взвешиванием меньше десяти дней. На коротком окне вода перевесит жир, и цифра получится любой.',
+      diary: 'Не хватает отметок в дневнике: считать средний факт не по чему.',
+      wild: 'Цифры не сходятся: съеденное и вес говорят разное. Обычно это вода после солёного или пропущенные отметки — посмотрите ещё неделю.'
+    };
+    if(!F.ok){
+      /* без этого блока непонятно, чего именно не хватает, и дневник
+         выглядит как отметки ради отметок */
+      const add = F.why === 'diary' ? ' Отмечено ' + F.have + ' из нужных ' + F.need + ' за ' + F.days + ' дней.' : '';
+      return head + `<p class="lead">Формула считает поддержку по росту, весу и образу жизни — это гипотеза с разбросом ±15%. Когда накопятся дневник и взвешивания, её можно будет заменить вашей собственной цифрой: съеденное минус то, что ушло массой.</p>
+        <p class="verdict v-warn" style="margin-top:10px">${why[F.why] || why.weight}${add}</p></div>`;
+    }
+    const num = v => Math.abs(v).toFixed(Math.abs(v) < 10 ? 1 : 0).replace('.', ',');
+    const n2 = calcNorm(profiles[who] || {});
+    const calc = n2 ? n2.tdeeCalc : null;
+    const diff = calc ? Math.round(F.tdee) - calc : 0;
+    return head + `<div class="norm-out">
+        <div><span class="lbl">Окно</span><b>${F.days}</b> <s>дней, отмечено ${F.marked}</s></div>
+        <div><span class="lbl">Средний факт</span><b>${nf(F.avg)}</b> <s>ккал в день</s></div>
+        <div><span class="lbl">Вес</span><b>${F.dw > 0 ? '+' : '−'}${num(F.dw)}</b> <s>кг за окно</s></div>
+        <div><span class="lbl">Поддержка по факту</span><b>${nf(F.tdee)}</b> <s>ккал</s></div>
+      </div>
+      <p class="lead" style="margin-top:12px">Съедено в среднем ${nf(F.avg)} ккал в день, вес за ${F.days} дней ${F.dw > 0 ? 'вырос' : F.dw < 0 ? 'ушёл' : 'не изменился'} на ${num(F.dw)} кг — значит организм тратил около ${nf(F.tdee)} ккал в день.${calc ? ' Формула обещала ' + nf(calc) + ' — разница ' + (diff > 0 ? '+' : '−') + nf(Math.abs(diff)) + '.' : ''}</p>
+      <div class="row" style="gap:7px;flex-wrap:wrap;margin-top:10px">
+        ${fix > 0
+          ? `<span class="verdict v-ok" style="flex:1 1 100%">Норма считается от этой цифры: ${nf(fix)} ккал минус дефицит. Пересчитать по свежим данным можно тем же нажатием.</span>
+             <button type="button" class="btn" data-tdeefix="${Math.round(F.tdee)}">Пересчитать по факту</button>
+             <button type="button" class="btn btn-2" data-tdeedrop="1">Вернуть расчётную</button>`
+          : `<button type="button" class="btn" data-tdeefix="${Math.round(F.tdee)}">Считать норму от этой цифры</button>`}
+      </div></div>`;
   })()}
   ${hist.length ? `<div class="card sec">
     <div class="sec-h"><h2>Журнал веса</h2><span class="lbl">${hist.length} ${hist.length === 1 ? 'запись' : hist.length < 5 ? 'записи' : 'записей'}</span></div>
@@ -3918,6 +3986,21 @@ document.addEventListener('click', e=>{
   }
   if(e.target.closest('#pf_save')){ saveProfile(); return; }
   if(e.target.closest('#pf_reset')){ delete profiles[who]; store.set('kotel.profiles', profiles); render(); return; }
+  const tf = e.target.closest('[data-tdeefix]');
+  if(tf){
+    const p2 = profiles[who] || {};
+    p2.tdeeFix = +tf.dataset.tdeefix;
+    profiles[who] = p2;
+    store.set('kotel.profiles', profiles);
+    render(); return;
+  }
+  if(e.target.closest('[data-tdeedrop]')){
+    const p3 = profiles[who] || {};
+    delete p3.tdeeFix;
+    profiles[who] = p3;
+    store.set('kotel.profiles', profiles);
+    render(); return;
+  }
   if(e.target.closest('#addFood')){ showForm = true; formMsg = ''; render(); return; }
   if(e.target.closest('#cancelFood')){ showForm = false; formMsg = ''; render(); return; }
   if(e.target.closest('#saveFood')){ saveFood(); return; }

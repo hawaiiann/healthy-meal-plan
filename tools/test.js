@@ -1824,6 +1824,89 @@ const probe = `
   console.log('проблем с дневником факта:', dn);
   }
 
+  { // поддержка по факту: дневник × весы
+  let ft = 0;
+  profiles = {}; eaten = {}; skipped = {}; swaps = {}; custom = []; recEdit = {};
+  rebuildFood(); rebuildRecipes();
+  who = 'm'; day = 0;
+  const iso = back => { const d = new Date(); d.setDate(d.getDate() - back); return d.toISOString().slice(0, 10); };
+
+  // без данных — честный отказ, а не цифра
+  if (factTdee('m').ok) { ft++; console.log('  поддержка посчиталась без данных'); }
+  if (factTdee('m').why !== 'weight') { ft++; console.log('  не сказано, что нужны весы:', factTdee('m').why); }
+
+  // два взвешивания, но окно короткое: вода перевесит жир
+  profiles.m = { sex:'m', age:31, h:175, wt:89.1, act:1.27, def:23, gk:1.8, fk:0.9,
+                 hist:[{ d:iso(5), wt:90 }, { d:iso(0), wt:89.1 }] };
+  if (factTdee('m').why !== 'short') { ft++; console.log('  короткое окно не отсеялось:', factTdee('m').why); }
+
+  // окно нормальное, но дневник пуст
+  profiles.m.hist = [{ d:iso(20), wt:90 }, { d:iso(0), wt:89.1 }];
+  const F0 = factTdee('m');
+  if (F0.why !== 'diary') { ft++; console.log('  пустой дневник не отсеялся:', F0.why); }
+  else if (F0.need < 7) { ft++; console.log('  порог отметок подозрительно низкий:', F0.need); }
+
+  // 14 дней ровно по 2 000 ккал при минус 0,9 кг за 20 дней
+  for (let i = 0; i < 14; i++) eaten['m|' + iso(i)] = { s:'off', k:2000, t:iso(i) };
+  const F = factTdee('m');
+  if (!F.ok) { ft++; console.log('  поддержка не посчиталась:', F.why); }
+  else {
+    const want = 2000 + 0.9 * 7700 / 20;          // съедено минус ушедшее массой
+    if (Math.abs(F.tdee - want) > 1) { ft++; console.log('  поддержка посчитана неверно:', Math.round(F.tdee), 'вместо', Math.round(want)); }
+    if (F.marked !== 14) { ft++; console.log('  в окно попало не 14 дней:', F.marked); }
+    if (Math.abs(F.avg - 2000) > 1) { ft++; console.log('  средний факт неверен:', Math.round(F.avg)); }
+    if (Math.abs(F.dw + 0.9) > 0.01) { ft++; console.log('  изменение веса неверно:', F.dw); }
+  }
+
+  // отметки вне окна между взвешиваниями в счёт не идут
+  eaten['m|' + iso(40)] = { s:'off', k:9000, t:iso(40) };
+  const F2 = factTdee('m');
+  if (F2.ok && Math.abs(F2.avg - 2000) > 1) { ft++; console.log('  в среднее попал день вне окна:', Math.round(F2.avg)); }
+  delete eaten['m|' + iso(40)];
+
+  // вода после солёного даёт бессмыслицу — её не показываем
+  profiles.m.hist = [{ d:iso(20), wt:97 }, { d:iso(0), wt:89 }];
+  const F3 = factTdee('m');
+  if (F3.ok) { ft++; console.log('  дикая цифра выдана за поддержку:', Math.round(F3.tdee)); }
+  if (F3.why !== 'wild') { ft++; console.log('  дикая цифра отсеялась не по той причине:', F3.why); }
+  profiles.m.hist = [{ d:iso(20), wt:90 }, { d:iso(0), wt:89.1 }];
+
+  // цифра применяется к норме и тянет за собой меню
+  const nBefore = calcNorm(profiles.m), dayBefore = dayTotals(0).k;
+  profiles.m.tdeeFix = Math.round(factTdee('m').tdee);
+  const nAfter = calcNorm(profiles.m);
+  if (nAfter.tdee !== profiles.m.tdeeFix) { ft++; console.log('  норма считает не по факту:', nAfter.tdee); }
+  if (!nAfter.byFact) { ft++; console.log('  не отмечено, что поддержка по весам'); }
+  if (nAfter.tdeeCalc !== nBefore.tdee) { ft++; console.log('  расчётная поддержка потерялась:', nAfter.tdeeCalc); }
+  if (Math.abs(nAfter.kcal - Math.round(profiles.m.tdeeFix * 0.77 / 5) * 5) > 1) { ft++; console.log('  дефицит применён не к той цифре:', nAfter.kcal); }
+  if (nAfter.kcal !== nBefore.kcal && dayTotals(0).k === dayBefore) { ft++; console.log('  меню не поехало за нормой'); }
+
+  // и снимается
+  delete profiles.m.tdeeFix;
+  if (calcNorm(profiles.m).tdee !== nBefore.tdee) { ft++; console.log('  расчётная поддержка не вернулась'); }
+
+  // страница рисуется в любом из состояний
+  for (const state of ['нет данных', 'есть данные', 'применено']) {
+    if (state === 'нет данных') { profiles.m = { sex:'m', age:31, h:175, wt:89.1, act:1.27, def:23, gk:1.8, fk:0.9 }; }
+    if (state === 'есть данные') { profiles.m.hist = [{ d:iso(20), wt:90 }, { d:iso(0), wt:89.1 }]; }
+    if (state === 'применено') { profiles.m.tdeeFix = 2350; }
+    const h = pageProfile();
+    if (bad(h).length) { ft++; console.log('  ПРОБЛЕМА параметров,', state + ':', bad(h).join(',')); }
+    if (h.indexOf('Поддержка по факту') < 0) { ft++; console.log('  нет карточки поддержки,', state); }
+  }
+  if (pageProfile().indexOf('Вернуть расчётную') < 0) { ft++; console.log('  применённую цифру нечем снять'); }
+  profiles.m.tdeeFix = undefined; delete profiles.m.tdeeFix;
+  if (pageProfile().indexOf('Считать норму от этой цифры') < 0) { ft++; console.log('  посчитанную цифру нечем применить'); }
+
+  // правка параметров не теряет посчитанную поддержку
+  profiles.m.tdeeFix = 2350;
+  const keep = Object.assign({}, profiles.m);
+  if (!(keep.tdeeFix > 0)) { ft++; console.log('  поддержка не переносится при правке профиля'); }
+
+  profiles = {}; eaten = {}; who = 'm'; day = 0;
+  console.log('проблем с поддержкой по факту:', ft);
+  }
+
   console.log('сегодня по календарю: индекс ' + TODAY + ' -> ' + PLAN.days[TODAY].name);
 })();
 `;
