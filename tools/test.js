@@ -268,11 +268,16 @@ const probe = `
   // личные нормы и пересчёт от веса
   let pp = 0;
   // формула Миффлина вручную: мужчина 31 год, 175 см, 90 кг
-  const ref = calcNorm({ sex:'m', age:31, h:175, wt:90, act:1.375, def:23, gk:1.8 });
+  const ref = calcNorm({ sex:'m', age:31, h:175, wt:90, act:1.27, gymH:1, walk:{n:3, km:3, pace:0.55}, def:23, gk:1.8 });
   const bmrExp = 10*90 + 6.25*175 - 5*31 + 5;
   if (Math.abs(ref.bmr - bmrExp) > 1) { pp++; console.log('  BMR посчитан неверно:', ref.bmr, 'ожидалось', bmrExp); }
-  if (Math.abs(ref.tdee - bmrExp*1.375) > 2) { pp++; console.log('  поддержка неверна:', ref.tdee); }
-  if (Math.abs(ref.kcal - bmrExp*1.375*0.77) > 5) { pp++; console.log('  норма с дефицитом неверна:', ref.kcal); }
+  // поддержка складывается: быт + зал + прогулки, а не один коэффициент
+  const gymExp = gymCount() * 90 * GYM_KCAL_KG_H * 1 / 7;
+  const walkExp = 3 * 3 * 90 * 0.55 / 7;
+  const tdeeExp = bmrExp * 1.27 + gymExp + walkExp;
+  if (Math.abs(ref.tdee - tdeeExp) > 2) { pp++; console.log('  поддержка неверна:', ref.tdee, 'ожидалось', Math.round(tdeeExp)); }
+  if (Math.abs(ref.life + ref.gym + ref.walk - ref.tdee) > 2) { pp++; console.log('  слагаемые не дают поддержку:', ref.life, ref.gym, ref.walk, ref.tdee); }
+  if (Math.abs(ref.kcal - tdeeExp*0.77) > 5) { pp++; console.log('  норма с дефицитом неверна:', ref.kcal, 'ожидалось', Math.round(tdeeExp*0.77)); }
   if (ref.prot !== 162) { pp++; console.log('  белок при 1,8 г/кг неверен:', ref.prot); }
   // неполные данные не должны давать норму
   for (const bad2 of [null, {}, {wt:80}, {wt:80,h:175}, {wt:0,h:175,age:31}]) {
@@ -1401,7 +1406,7 @@ const probe = `
   if (pageWeek().indexOf('data-edit') < 0) { ed2++; console.log('  нет кнопки правки навески'); }
   editOpen(0, 2);
   const hEd = pageWeek();
-  if (hEd.indexOf('Сколько положили на самом деле') < 0) { ed2++; console.log('  панель правки не открылась'); }
+  if (hEd.indexOf('Что и сколько съели на самом деле') < 0) { ed2++; console.log('  панель правки не открылась'); }
   if (hEd.indexOf('id="ed_0"') < 0) { ed2++; console.log('  нет поля ввода веса'); }
   if (hEd.indexOf('data-edoff') < 0) { ed2++; console.log('  нет кнопки «не учитывать»'); }
   if (bad(hEd).length) { ed2++; console.log('  ПРОБЛЕМА отрисовки панели правки:', bad(hEd).join(',')); }
@@ -1486,6 +1491,199 @@ const probe = `
   }
   day = 0;
   console.log('проблем с разбором приёма:', qs);
+  }
+
+  { // пропуск приёма
+  let sk = 0;
+  profiles = {}; swaps = {}; skipped = {}; custom = []; recEdit = {};
+  rebuildFood(); rebuildRecipes();
+  who = 'm'; day = 0;
+  gymDays = PLAN.days.map(d => !!d.gym);
+
+  const base0 = dayTotals(0).k, plan1 = mealView(0, 1).v.k;
+  toggleSkip(0, 1);
+  const V1 = mealView(0, 1);
+  if (!V1.skip) { sk++; console.log('  приём не отметился пропущенным'); }
+  if (V1.v.k !== 0) { sk++; console.log('  пропущенный приём всё ещё в счёте:', V1.v.k); }
+  if (Math.abs(V1.plan.k - plan1) > 1) { sk++; console.log('  потеряли, чем приём был:', V1.plan.k); }
+  if (Math.abs(dayTotals(0).k - (base0 - plan1)) > 1) { sk++; console.log('  день не уменьшился на пропущенный приём:', dayTotals(0).k, base0 - plan1); }
+  if (partsOfMeal(0, 1, 'm').parts.length) { sk++; console.log('  пропущенный приём попал в список продуктов'); }
+  if (pairMeal(0, 1).together) { sk++; console.log('  пропуск у одного не должен складываться со вторым'); }
+
+  const hs = pageWeek();
+  if (hs.indexOf('пропущен') < 0) { sk++; console.log('  в неделе не видно, что приём пропущен'); }
+  if (hs.indexOf('Вернуть приём') < 0) { sk++; console.log('  нет кнопки вернуть приём'); }
+  if (hs.indexOf('Пропущен') < 0) { sk++; console.log('  день не сказал, сколько потеряно'); }
+  if (hs.indexOf('data-swap="0.1"') >= 0) { sk++; console.log('  у пропущенного приёма осталась замена'); }
+  if (bad(hs).length) { sk++; console.log('  ПРОБЛЕМА отрисовки недели с пропуском:', bad(hs).join(',')); }
+  if (bad(rail()).length) { sk++; console.log('  ПРОБЛЕМА боковой колонки с пропуском'); }
+
+  // пропускают оба — на двоих это отдельная карточка
+  toggleSkip(0, 1, 'w');
+  const P0 = pairMeal(0, 1);
+  if (!(P0.skM && P0.skW)) { sk++; console.log('  пропуск второго не увиделся'); }
+  const hp0 = pagePair();
+  if (hp0.indexOf('пропускают оба') < 0) { sk++; console.log('  на двоих не видно общего пропуска'); }
+  if (bad(hp0).length) { sk++; console.log('  ПРОБЛЕМА отрисовки на двоих:', bad(hp0).join(',')); }
+
+  // пропустил один — готовим на одного, без сложения
+  toggleSkip(0, 1, 'w');
+  const hp1 = pagePair();
+  if (hp1.indexOf('Готовим на одного') < 0) { sk++; console.log('  пропуск у одного не объяснён'); }
+  if (bad(hp1).length) { sk++; console.log('  ПРОБЛЕМА карточки на одного:', bad(hp1).join(',')); }
+
+  // весь день пропущен — страницы не разваливаются
+  for (let mi = 0; mi < PLAN.days[0].meals.length; mi++)
+    for (const kk of ['m', 'w']) if (!skipped[swapKey(0, mi, kk)]) toggleSkip(0, mi, kk);
+  for (const fpage of [pageWeek, pagePair]) {
+    const b2 = bad(fpage());
+    if (b2.length) { sk++; console.log('  ПРОБЛЕМА пустого дня:', b2.join(',')); }
+  }
+  const onlyDrinks = Math.round(drinkTotals('m').k);
+  if (Math.abs(dayTotals(0).k - onlyDrinks) > 1) { sk++; console.log('  пустой день не сошёлся к напиткам:', dayTotals(0).k, onlyDrinks); }
+
+  // вернули всё — день сошёлся ровно к исходному
+  skipped = {};
+  if (Math.abs(dayTotals(0).k - base0) > 1) { sk++; console.log('  день не вернулся после отмены пропусков'); }
+
+  // перенос набора дня забирает и пропуски
+  toggleSkip(2, 0, 'm');
+  syncDay(2, 'm');
+  if (!skipped[swapKey(2, 0, 'w')]) { sk++; console.log('  пропуск не перенёсся на второго'); }
+  skipped = {}; swaps = {}; day = 0;
+  console.log('проблем с пропуском приёма:', sk);
+  }
+
+  { // добавить продукт в приём
+  let ad = 0;
+  profiles = {}; swaps = {}; skipped = {}; custom = []; recEdit = {};
+  rebuildFood(); rebuildRecipes();
+  who = 'm'; day = 0;
+
+  const dayPlan = dayTotals(0).k;
+  editOpen(0, 0);
+  const ha = pageWeek();
+  if (ha.indexOf('Добавить в приём') < 0) { ad++; console.log('  в панели нет добавления продукта'); }
+  if (ha.indexOf('data-edadd=') < 0) { ad++; console.log('  нечего добавить: пустой список продуктов'); }
+  if (bad(ha).length) { ad++; console.log('  ПРОБЛЕМА панели состава:', bad(ha).join(',')); }
+
+  edQ = 'йогурт';
+  const cnt = (pageWeek().match(/data-edadd=/g) || []).length;
+  if (cnt < 1) { ad++; console.log('  поиск по продуктам ничего не нашёл'); }
+  if (cnt > 4) { ad++; console.log('  поиск не сузил список:', cnt); }
+  edQ = '';
+
+  editSave(0, 0);                       // сохранили тот же состав — точка отсчёта
+  const was2 = mealView(0, 0).v.k, dayWas = dayTotals(0).k;
+  editOpen(0, 0);
+  editDraft.push({ n:'яйцо', g: defG('яйцо'), off:false });
+  editSave(0, 0);
+  const now2 = mealView(0, 0);
+  const egg = Math.round(FOOD['яйцо'].k * defG('яйцо') / 100);
+  if (now2.qty.indexOf('яйцо') < 0) { ad++; console.log('  добавленного продукта нет в навеске:', now2.qty); }
+  if (Math.abs(now2.v.k - (was2 + egg)) > 3) { ad++; console.log('  калории приёма не выросли на добавленное:', now2.v.k, was2 + egg); }
+  if (Math.abs(dayTotals(0).k - (dayWas + egg)) > 3) { ad++; console.log('  день не увидел добавленного'); }
+  dropSwap(0, 0);
+  if (Math.abs(dayTotals(0).k - dayPlan) > 1) { ad++; console.log('  день не вернулся после отмены'); }
+
+  // заготовку тоже можно доложить в приём
+  editOpen(1, 1);
+  editDraft.push({ n:'хлеб', g: defG('хлеб'), off:false });
+  editSave(1, 1);
+  if (bad(pageWeek()).length) { ad++; console.log('  ПРОБЛЕМА приёма с добавленной заготовкой'); }
+  dropSwap(1, 1);
+
+  // вес по умолчанию: штучное штукой, весовое — примерно на 80 ккал
+  if (defG('яйцо') !== 55) { ad++; console.log('  штучный продукт добавляется не штукой:', defG('яйцо')); }
+  for (const n2 of ['масло раст.', 'творог 5%', 'гречка гот.', 'шоколад 85%']) {
+    const kk2 = FOOD[n2].k * defG(n2) / 100;
+    if (kk2 < 40 || kk2 > 130) { ad++; console.log('  вес по умолчанию странный:', n2, Math.round(kk2), 'ккал'); }
+  }
+  editKey = null; editDraft = null;
+  console.log('проблем с добавлением в приём:', ad);
+  }
+
+  { // правка заготовки
+  let rp = 0;
+  profiles = {}; swaps = {}; skipped = {}; custom = []; recEdit = {};
+  rebuildFood(); rebuildRecipes();
+  who = 'm'; day = 0;
+
+  // пересчёт из навески повторяет генератор
+  for (const r of PLAN.recipes) {
+    const again = recalcRecipe(r, { ing: r.ing.map(x => ({ n:x.n, g:x.g })), outG: r.outG });
+    if (Math.abs(again.per100.k - r.per100.k) > 2) { rp++; console.log('  пересчёт разошёлся с генератором:', r.key, again.per100.k, 'vs', r.per100.k); }
+    if (Math.abs(again.per100.p - r.per100.p) > 0.4) { rp++; console.log('  белок при пересчёте разошёлся:', r.key, again.per100.p, 'vs', r.per100.p); }
+    if (r.ing.some(x => ORIG[x.n])) { rp++; console.log('  заготовка внутри заготовки:', r.key); }
+    if (r.ing.some(x => !rawFood(x.n))) { rp++; console.log('  в заготовке неизвестный продукт:', r.key); }
+  }
+
+  let hit = null;
+  for (let di = 0; di < PLAN.days.length && !hit; di++)
+    for (let mi = 0; mi < PLAN.days[di].meals.length; mi++) {
+      const pr = splitParts(PLAN.days[di].meals[mi].m.qty).filter(x => x.n === 'лазанья');
+      if (pr.length) { hit = { di, mi, g: pr[0].g }; break; }
+    }
+  if (!hit) { rp++; console.log('  в меню не нашлось лазаньи'); }
+  else {
+    const kWas = mealView(hit.di, hit.mi).v.k, dWas = dayTotals(hit.di).k;
+    const src = ORIG['лазанья'];
+    recEdit['лазанья'] = { ing: src.ing.filter(x => x.n !== 'сыр лёгкий').map(x => ({ n:x.n, g:x.g })), outG: src.outG };
+    rebuildRecipes();
+    const now3 = RECIPE['лазанья'];
+    if (!now3.edited) { rp++; console.log('  правка не отметилась'); }
+    if (now3.per100.k >= src.per100.k) { rp++; console.log('  без сыра калорийность не упала:', now3.per100.k, src.per100.k); }
+    const expect = kWas + (now3.per100.k - src.per100.k) * hit.g / 100;
+    const kNow = mealView(hit.di, hit.mi).v.k;
+    if (Math.abs(kNow - expect) > 3) { rp++; console.log('  приём не поехал за заготовкой:', kNow, Math.round(expect)); }
+    if (Math.abs(dayTotals(hit.di).k - (dWas + kNow - kWas)) > 3) { rp++; console.log('  день не поехал за приёмом'); }
+
+    day = hit.di;
+    const hr = pageRecipes();
+    if (hr.indexOf('изменено') < 0) { rp++; console.log('  в рецептах не видно правки'); }
+    if (hr.indexOf('Изменить состав') < 0) { rp++; console.log('  нет кнопки правки заготовки'); }
+    if (bad(hr).length) { rp++; console.log('  ПРОБЛЕМА рецептов:', bad(hr).join(',')); }
+    if (bad(pageWeek()).length) { rp++; console.log('  ПРОБЛЕМА недели с правленой заготовкой'); }
+    if (bad(pagePair()).length) { rp++; console.log('  ПРОБЛЕМА раздела на двоих с правленой заготовкой'); }
+
+    recKey = 'лазанья';
+    recDraft = { ing: RECIPE['лазанья'].ing.map(x => ({ n:x.n, g:x.g })), outG: RECIPE['лазанья'].outG };
+    const hr2 = pageRecipes();
+    if (hr2.indexOf('Навеска закладки') < 0) { rp++; console.log('  панель правки не открылась'); }
+    if (hr2.indexOf('Станет на 100 г') < 0) { rp++; console.log('  не видно, что станет'); }
+    if (hr2.indexOf('data-recadd=') < 0) { rp++; console.log('  нечего добавить в заготовку'); }
+    if (bad(hr2).length) { rp++; console.log('  ПРОБЛЕМА панели правки:', bad(hr2).join(',')); }
+
+    // сохранение исходного состава правку снимает
+    recDraft = { ing: src.ing.map(x => ({ n:x.n, g:x.g })), outG: src.outG };
+    saveRecipe();
+    if (recEdit['лазанья']) { rp++; console.log('  возврат к плановой навеске не снял правку'); }
+    if (RECIPE['лазанья'].edited) { rp++; console.log('  заготовка осталась помеченной'); }
+    if (Math.abs(mealView(hit.di, hit.mi).v.k - kWas) > 1) { rp++; console.log('  приём не вернулся:', mealView(hit.di, hit.mi).v.k, kWas); }
+    if (Math.abs(dayTotals(hit.di).k - dWas) > 1) { rp++; console.log('  день не вернулся'); }
+
+    // выход вдвое меньше — вдвое плотнее, и это видно в подписи
+    recEdit['лазанья'] = { ing: src.ing.map(x => ({ n:x.n, g:x.g })), outG: Math.round(src.outG / 2) };
+    rebuildRecipes();
+    if (RECIPE['лазанья'].per100.k < src.per100.k * 1.8) { rp++; console.log('  выход вдвое меньше не удвоил плотность'); }
+    if (String(RECIPE['лазанья'].gear).indexOf(yieldTxt(Math.round(src.outG / 2))) < 0) { rp++; console.log('  в подписи остался старый выход:', RECIPE['лазанья'].gear); }
+    recEdit = {}; rebuildRecipes();
+    if (Math.abs(mealView(hit.di, hit.mi).v.k - kWas) > 1) { rp++; console.log('  сброс правок не вернул приём'); }
+  }
+
+  // удалили свой продукт — он уходит и из правленой заготовки
+  custom.push({ n:'тестовый сыр', cat:'Молочное', k:300, p:20, f:24, c:1, b:0, unit:0, on:true, mine:true });
+  rebuildFood();
+  recEdit['тефтели'] = { ing: ORIG['тефтели'].ing.map(x => ({ n:x.n, g:x.g })).concat([{ n:'тестовый сыр', g:100 }]), outG: ORIG['тефтели'].outG };
+  rebuildRecipes();
+  if (!RECIPE['тефтели'].edited) { rp++; console.log('  свой продукт не добавился в заготовку'); }
+  custom = custom.filter(f => f.n !== 'тестовый сыр');
+  rebuildFood();
+  purgeFood('тестовый сыр');
+  if ((recEdit['тефтели'] || { ing:[] }).ing.some(x => x.n === 'тестовый сыр')) { rp++; console.log('  удалённый продукт остался в заготовке'); }
+  recEdit = {}; recKey = null; recDraft = null; rebuildRecipes();
+  custom = []; rebuildFood(); day = 0;
+  console.log('проблем с правкой заготовки:', rp);
   }
 
   console.log('сегодня по календарю: индекс ' + TODAY + ' -> ' + PLAN.days[TODAY].name);

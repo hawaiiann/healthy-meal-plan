@@ -356,6 +356,9 @@ button{font:inherit; color:inherit; border:none; background:none; cursor:pointer
 .meal .qty{font-size:12px; color:var(--ink3); line-height:1.4}
 .meal .note{font-size:11.5px; color:var(--ink3); margin-top:5px; line-height:1.4}
 .meal-r{display:flex; align-items:center; gap:14px}
+/* кнопки приёма — своей строкой справа: в одну строку с макросами они
+   отжимали состав блюда до нечитаемой колонки в сотню пикселей */
+.meal-a{grid-column:2 / -1; display:flex; flex-wrap:wrap; justify-content:flex-end; gap:7px; margin-top:2px}
 .kcal-b{text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:1px}
 .kcal-b b{font-family:Nunito,sans-serif; font-size:19px; font-weight:800; line-height:1;
   letter-spacing:-.02em; font-variant-numeric:tabular-nums}
@@ -480,6 +483,13 @@ summary::-webkit-details-marker{display:none}
 .sub-h:first-of-type{margin-top:2px}
 .meal .qty em.src{font-style:normal; font-family:Nunito,sans-serif; font-size:10px; font-weight:700;
   letter-spacing:.08em; text-transform:uppercase; color:var(--ink3); margin-right:4px}
+.meal.skipped{opacity:.62; border-style:dashed}
+.meal.skipped .meal-h h4, .meal.skipped .qty{text-decoration:line-through; text-decoration-color:var(--ink3)}
+.meal.skipped .kcal-b b{color:var(--ink3)}
+.skip-tag{font-family:Nunito,sans-serif; font-size:9.5px; font-weight:700; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--ink3); border:1px dashed var(--line2); border-radius:99px; padding:2px 7px}
+.aim-row input{width:76px; padding:4px 7px; border-radius:7px; border:1px solid var(--line2); background:var(--card);
+  color:var(--ink); font-family:"JetBrains Mono",monospace; font-size:12.5px; text-align:right}
 .comp.off{opacity:.55}
 .comp.off h5{text-decoration:line-through}
 .comp .g input{width:62px; padding:5px 7px; border-radius:7px; border:1px solid var(--line2); background:var(--card);
@@ -545,6 +555,7 @@ summary::-webkit-details-marker{display:none}
   .tiles .tile:last-child:nth-child(odd){grid-column:1 / -1}
   .meal{grid-template-columns:44px minmax(0,1fr); gap:11px}
   .meal-r{grid-column:1 / -1; justify-content:space-between; gap:8px}
+  .meal-a{grid-column:1 / -1; justify-content:flex-start}
   .macro-mini{gap:4px}
   .norms,.notes,.g2,.g3{grid-template-columns:minmax(0,1fr)}
   /* на телефоне «почти хватает» встаёт в две строки: иначе название блюда
@@ -779,6 +790,31 @@ let swapQ = '';       /* фильтр по блюдам и продуктам в
 let editKey = null;
 let editDraft = null;
 
+
+/* Приём можно и вовсе пропустить: не успел, ели в гостях, не хотелось.
+   Пропуск — не удаление: блюдо остаётся на виду и видно, чего день
+   недосчитался. Ключ тот же, что у замен, — у каждого пропуск свой. */
+let skipped = store.get('kotel.skip', {}) || {};
+if(typeof skipped !== 'object') skipped = {};
+
+/* Правка заготовки. Рецепт — не догма: грибов взяли больше, сметану
+   убрали, вышло не 2,4 кг, а два. Меняется навеска или выход — меняется
+   КБЖУ на 100 г, а следом и все приёмы, где эта заготовка стоит. */
+let recEdit = store.get('kotel.recipes', {}) || {};
+if(typeof recEdit !== 'object') recEdit = {};
+let recKey = null;    /* какая заготовка правится сейчас */
+let recDraft = null;
+let recQ = '';        /* поиск продукта для заготовки */
+let edQ = '';         /* то же для приёма */
+
+/* Поле ввода живёт внутри панели, которую render() перерисовывает
+   целиком, — после перерисовки возвращаем фокус и каретку на место. */
+function keepCaret(el){
+  const pos = el.selectionStart, id = el.id;
+  render();
+  const back = document.getElementById(id);
+  if(back){ back.focus(); try { back.setSelectionRange(pos, pos); } catch(err){} }
+}
 /* Дневник съеденного. План есть, факта нет — и через месяц непонятно,
    почему вес стоит: то ли план не работает, то ли по нему никто не жил.
    Отметка привязана к календарной дате, а не к номеру дня недели, чтобы
@@ -853,7 +889,7 @@ function searchAll(raw){
     if(hit(m.title) || hit(m.note) || hit(m[who].qty)) meals.push({d,di,m});
   }));
   const recipes = [];
-  PLAN.recipes.forEach((r,ri) => {
+  RECIPES.forEach((r,ri) => {
     if(hit(r.title) || hit(r.gear) || r.ing.some(i => hit(i.n)) || r.steps.some(hit) || hit(r.hint)) recipes.push({r,ri});
   });
   const snacks = PLAN.snacks.filter(x => hit(x.title) || hit(x.qty) || hit(x.note));
@@ -2116,19 +2152,33 @@ function scaleParts(parts, targetK){
   return parts;
 }
 
-/* что стоит в приёме сейчас: план или уже поставленная замена */
+/* что стоит в приёме сейчас: план, поставленная замена — или ничего,
+   если приём решили пропустить */
 function mealView(di, mi, k){
+  k = k || who;
+  const V = mealPlanned(di, mi, k);
+  if(!skipped[swapKey(di, mi, k)]) return V;
+  /* пропущенный приём остаётся на виду, но в счёт дня не идёт */
+  return Object.assign({}, V, { skip:true, plan:V.v, v:{ k:0, p:0, f:0, c:0, b:0 } });
+}
+function mealPlanned(di, mi, k){
   k = k || who;
   const m = PLAN.days[di].meals[mi];
   const sw = swaps[swapKey(di, mi, k)];
   if(!sw || !sw.items || !sw.items.length){
     const f = mealFactor(k, PLAN.days[di].id), v = m[k];
-    if(Math.abs(f - 1) < 0.005)
+    const scaled = Math.abs(f - 1) >= 0.005;
+    /* заготовку в этом приёме могли поправить руками — тогда цифры
+       генератора уже не те, и разницу нужно учесть */
+    const d = recDirty() ? recShift(splitParts(v.qty), f) : null;
+    const moved = !!(d && (d.k || d.p || d.f || d.c || d.b));
+    if(!scaled && !moved)
       return { title:m.title, note:m.note, label:m.label, qty:v.qty, v, swapped:false };
-    return { title:m.title, note:m.note, label:m.label, swapped:false, scaled:true,
-             qty: scaleQty(v.qty, f),
-             v: { k:Math.round(v.k*f), p:Math.round(v.p*f), f:Math.round(v.f*f), c:Math.round(v.c*f),
-                  b:Math.round((v.b || 0)*f*10)/10 } };
+    return { title:m.title, note:m.note, label:m.label, swapped:false, scaled, edited:moved,
+             qty: scaled ? scaleQty(v.qty, f) : v.qty,
+             v: { k:Math.round(v.k*f + (moved ? d.k : 0)), p:Math.round(v.p*f + (moved ? d.p : 0)),
+                  f:Math.round(v.f*f + (moved ? d.f : 0)), c:Math.round(v.c*f + (moved ? d.c : 0)),
+                  b:Math.round(((v.b || 0)*f + (moved ? d.b : 0))*10)/10 } };
   }
   const s = sumOf(sw.items);
   return {
@@ -2151,8 +2201,12 @@ function dayTotals(di, k){
    продуктов взять всего — и сколько потом положить каждому. Складываем
    навески обоих и сразу показываем, как делить готовое. */
 
-const RECIPE = {};
-PLAN.recipes.forEach(r => { RECIPE[r.key] = r; });
+/* PLAN.recipes — то, что посчитал генератор, ORIG; RECIPE и RECIPES —
+   то, что действует сейчас, с учётом правок из этого браузера. */
+const ORIG = {};
+PLAN.recipes.forEach(r => { ORIG[r.key] = r; });
+let RECIPES = PLAN.recipes.slice();
+let RECIPE = {};
 
 /* Заготовки и «кухонные» продукты в кладовке конструктора не лежат,
    а в навесках и рецептах стоят наравне со всеми. Здесь они находятся. */
@@ -2161,9 +2215,82 @@ function anyFood(n){
   const f = FOOD[n];
   if(f) return f;
   const r = RECIPE[n];
-  if(r) return { n, k:r.per100.k, p:r.per100.p, f:r.per100.f, c:r.per100.c, batch:true };
+  if(r) return { n, k:r.per100.k, p:r.per100.p, f:r.per100.f, c:r.per100.c, b:r.per100.b || 0, batch:true };
   const b = BASE[n];
   return b ? { n, k:b.k, p:b.p, f:b.f, c:b.c } : null;
+}
+/* КБЖУ ингредиента заготовки: сырьё лежит либо в кладовке, либо в
+   «кухонном» словаре. Заготовок внутри заготовок нет — это проверяет
+   тест, — поэтому дальше рекурсия не нужна. */
+function rawFood(n){
+  const f = FOOD[n]; if(f) return f;
+  const b = BASE[n]; if(b) return b;
+  const r = ORIG[n]; return r ? r.per100 : null;
+}
+const ingTxt = (n, g) => {
+  const f = FOOD[n];
+  return f && f.unit ? Math.round(g / f.unit) + ' шт · ' + Math.round(g) + ' г' : Math.round(g) + ' г';
+};
+const yieldTxt = g => g >= 1000 ? String(Math.round(g / 100) / 10).replace('.', ',') + ' кг' : Math.round(g) + ' г';
+/* заготовка с чужой навеской: КБЖУ на 100 г считается заново из состава
+   и выхода — ровно так же, как это делает генератор */
+function recalcRecipe(r, ov){
+  const ing = (ov.ing || []).filter(x => x.g > 0)
+    .map(x => ({ n:x.n, g:Math.round(x.g), txt:ingTxt(x.n, x.g) }));
+  const outG = Math.max(50, Math.round(ov.outG || r.outG));
+  const t = ing.reduce((a, x) => {
+    const f = rawFood(x.n); if(!f) return a;
+    a.k += f.k * x.g / 100; a.p += f.p * x.g / 100; a.f += f.f * x.g / 100;
+    a.c += f.c * x.g / 100; a.b += (f.b || 0) * x.g / 100;
+    return a;
+  }, { k:0, p:0, f:0, c:0, b:0 });
+  const one = x => Math.round(x / outG * 1000) / 10;
+  const per100 = { k: Math.round(t.k / outG * 100), p: one(t.p), f: one(t.f), c: one(t.c), b: one(t.b) };
+  const port = g => ({ k: Math.round(per100.k * g / 100), p: Math.round(per100.p * g / 100),
+                       f: Math.round(per100.f * g / 100), c: Math.round(per100.c * g / 100) });
+  return Object.assign({}, r, { ing, outG, per100, vw: port(r.pw), vm: port(r.pm), edited: true,
+    gear: String(r.gear).replace(/выход\s+[^·]+/, 'выход ' + yieldTxt(outG) + ' ') });
+}
+function rebuildRecipes(){
+  RECIPES = PLAN.recipes.map(r => recEdit[r.key] ? recalcRecipe(r, recEdit[r.key]) : r);
+  RECIPE = {};
+  RECIPES.forEach(r => { RECIPE[r.key] = r; });
+}
+rebuildRecipes();
+const recDirty = () => Object.keys(recEdit).length > 0;
+/* Заготовку поправили — приёмы, где она стоит, должны поехать следом.
+   Плановое КБЖУ приёма посчитал генератор, поэтому пересчитываем не весь
+   приём, а разницу: сколько эта заготовка давала и сколько даёт теперь. */
+function recShift(parts, f){
+  const d = { k:0, p:0, f:0, c:0, b:0 };
+  for(const x of parts){
+    const now = RECIPE[x.n], was = ORIG[x.n];
+    if(!now || !was || !now.edited) continue;
+    const g = x.g * f / 100;
+    d.k += (now.per100.k - was.per100.k) * g;
+    d.p += (now.per100.p - was.per100.p) * g;
+    d.f += (now.per100.f - was.per100.f) * g;
+    d.c += (now.per100.c - was.per100.c) * g;
+    d.b += ((now.per100.b || 0) - (was.per100.b || 0)) * g;
+  }
+  return d;
+}
+/* сколько приёмов недели держится на этой заготовке */
+function mealsWithBatch(key){
+  let n = 0;
+  for(let di = 0; di < PLAN.days.length; di++)
+    for(let mi = 0; mi < PLAN.days[di].meals.length; mi++)
+      for(const k of ['m', 'w'])
+        if(splitParts(PLAN.days[di].meals[mi][k].qty).some(x => x.n === key)){ n++; break; }
+  return n;
+}
+/* сколько класть по умолчанию: штука — штукой, весовое — примерно на
+   80 ккал, чтобы добавленный продукт сразу был похож на порцию */
+function defG(n){
+  const f = anyFood(n); if(!f) return 0;
+  if(f.unit) return f.unit;
+  if(!(f.k > 0)) return 50;
+  return Math.min(200, Math.max(10, Math.round(8000 / f.k / 5) * 5));
 }
 function splitParts(text){
   const out = [];
@@ -2177,6 +2304,8 @@ function splitParts(text){
 }
 function partsOfMeal(di, mi, k){
   const V = mealView(di, mi, k);
+  /* пропущенный приём не готовят: складывать и взвешивать нечего */
+  if(V.skip) return { V, parts: [] };
   return { V, parts: (V.items && V.items.length)
     ? V.items.map(x => ({ n:x.n, g:x.g, r:x.r, side:x.side })) : splitParts(V.qty) };
 }
@@ -2192,7 +2321,9 @@ const gTxt = (n, g) => {
 /* один приём на двоих: общий вес по каждому продукту и деление по тарелкам */
 function pairMeal(di, mi){
   const A = partsOfMeal(di, mi, 'm'), B = partsOfMeal(di, mi, 'w');
-  const together = A.V.title === B.V.title && (A.V.tplId || '') === (B.V.tplId || '');
+  const skM = !!A.V.skip, skW = !!B.V.skip;
+  /* если один пропускает — складывать нечего, готовится одна порция */
+  const together = !skM && !skW && A.V.title === B.V.title && (A.V.tplId || '') === (B.V.tplId || '');
   const map = new Map();
   const add = (parts, key) => parts.forEach(x => {
     const e = map.get(x.n) || { n:x.n, m:0, w:0 };
@@ -2201,7 +2332,7 @@ function pairMeal(di, mi){
   add(A.parts, 'm'); add(B.parts, 'w');
   const rows = Array.from(map.values()).map(e => Object.assign(e, { g: e.m + e.w }));
   const kk = A.V.v.k + B.V.v.k;
-  return { di, mi, A, B, rows, together, k:kk, share: kk > 0 ? Math.round(A.V.v.k / kk * 100) : 50,
+  return { di, mi, A, B, rows, together, skM, skW, k:kk, share: kk > 0 ? Math.round(A.V.v.k / kk * 100) : 50,
            pm: plateOf(A.parts), pw: plateOf(B.parts) };
 }
 /* порядок готовки, пересчитанный на общий вес: одна сковорода на двоих */
@@ -2333,8 +2464,24 @@ function purgeFood(n){
     if(left.length) sw.items = left; else delete swaps[key];
   }
   if(touched) store.set('kotel.swaps', swaps);
+  /* тот же продукт мог стоять в правленой заготовке */
+  let inRec = false;
+  for(const key of Object.keys(recEdit)){
+    const ov = recEdit[key], was = (ov.ing || []).length;
+    const left = (ov.ing || []).filter(x => x.n !== n);
+    if(left.length === was) continue;
+    inRec = true;
+    if(left.length) ov.ing = left; else delete recEdit[key];
+  }
+  if(inRec){ store.set('kotel.recipes', recEdit); rebuildRecipes(); }
 }
 
+/* пропустить приём и вернуть его обратно — одно и то же движение */
+function toggleSkip(di, mi, k){
+  const key = swapKey(di, mi, k);
+  if(skipped[key]) delete skipped[key]; else skipped[key] = 1;
+  store.set('kotel.skip', skipped);
+}
 function dropSwap(di, mi){
   delete swaps[swapKey(di, mi)];
   store.set('kotel.swaps', swaps);
@@ -2356,9 +2503,13 @@ function dayApart(di){
 function syncDay(di, from){
   const src = from || who, dst = src === 'm' ? 'w' : 'm';
   const dayId = PLAN.days[di].id, f = mealFactor(dst, dayId);
-  let moved = 0, cleared = 0;
+  let moved = 0, cleared = 0, skips = 0;
   PLAN.days[di].meals.forEach((m, mi) => {
     const sw = swaps[swapKey(di, mi, src)], key = swapKey(di, mi, dst);
+    /* пропуск — тоже часть набора дня: перенести блюда и оставить у
+       второго дыру было бы странно */
+    if(skipped[swapKey(di, mi, src)]){ if(!skipped[key]){ skipped[key] = 1; skips++; } }
+    else if(skipped[key]){ delete skipped[key]; skips++; }
     if(!sw || !sw.items || !sw.items.length){
       if(swaps[key]){ delete swaps[key]; cleared++; }
       return;
@@ -2369,7 +2520,8 @@ function syncDay(di, from){
     moved++;
   });
   store.set('kotel.swaps', swaps);
-  return { moved, cleared, dst };
+  store.set('kotel.skip', skipped);
+  return { moved, cleared, dst, skips };
 }
 
 function fromMeal(di, mi){
@@ -2962,7 +3114,7 @@ const SUBS = {
 /* ---------- рендер ---------- */
 function renderNav(){
   document.getElementById('nav').innerHTML = PAGES.map(([id,t,ic])=>{
-    const c = id==='week' || id==='pair' ? PLAN.days.length : id==='cons' ? allFoods().length : id==='recipes' ? DISHES.length + PLAN.recipes.length
+    const c = id==='week' || id==='pair' ? PLAN.days.length : id==='cons' ? allFoods().length : id==='recipes' ? DISHES.length + RECIPES.length
             : id==='snacks' ? PLAN.snacks.length+PLAN.sweets.length : id==='drinks' ? PLAN.drinks.length : '';
     return `<button type="button" data-page="${id}" aria-current="${id===page}">${svg(ic)}<span>${t}</span>${c?`<span class="count">${c}</span>`:''}</button>`;
   }).join('');
@@ -3051,6 +3203,7 @@ function editOpen(di, mi){
   const V = mealView(di, mi);
   const parts = (V.items && V.items.length) ? V.items : splitParts(V.qty);
   editKey = di + '.' + mi;
+  edQ = '';
   editDraft = parts.map(x => ({ n:x.n, g:x.g, r:x.r, side:!!x.side, off:false }));
 }
 function editSave(di, mi){
@@ -3080,10 +3233,25 @@ function editPanel(di, mi){
     </div>`;
   }).join('');
   const d = Math.round(tot.k - aim);
+  /* Добавить в приём. План — не приговор: съели ещё йогурт, положили
+     хлеба к супу, добавили ложку масла. Продукт попадает в тот же
+     черновик, что и правка веса, и сохраняется той же заменой. */
+  const qq = edQ.trim().toLowerCase();
+  const has = n => (editDraft || []).some(x => x.n === n);
+  const pool = allFoods().concat(RECIPES.map(r => ({ n:r.key })))
+    .filter(f => !has(f.n) && (qq ? (f.n + ' ' + word(f.n)).toLowerCase().indexOf(qq) >= 0 : !!pantry[f.n]))
+    .sort((a, b) => (pantry[b.n] ? 1 : 0) - (pantry[a.n] ? 1 : 0))
+    .slice(0, 12);
   return `<div class="swp">
-    <span class="lbl">Сколько положили на самом деле<i></i></span>
-    <p class="s" style="font-size:11.5px;color:var(--ink3);margin-bottom:9px">Впишите свой вес — крестик убирает продукт из счёта, не трогая остальные. Итог дня пересчитается сразу.</p>
+    <span class="lbl">Что и сколько съели на самом деле<i></i></span>
+    <p class="s" style="font-size:11.5px;color:var(--ink3);margin-bottom:9px">Впишите свой вес, крестик убирает продукт из счёта, а поиск ниже добавляет то, чего в плане не было. Итог дня пересчитается сразу.</p>
     <div class="res-list">${rows}</div>
+    <span class="lbl" style="margin-top:12px">Добавить в приём<i></i></span>
+    <input id="edq" class="swq" type="search" placeholder="Продукт или заготовка: йогурт, хлеб, плов" value="${esc(edQ)}">
+    ${pool.length
+      ? `<div class="dish-pick" style="padding:0">${pool.map(f =>
+          `<button type="button" data-edadd="${esc(f.n)}">${esc(word(f.n))} <b>${esc(gTxt(f.n, defG(f.n)))}</b></button>`).join('')}</div>`
+      : `<p class="s" style="font-size:11.5px;color:var(--ink3)">Ничего не нашлось${qq ? ' по запросу «' + esc(edQ) + '»' : ''}. Без запроса показаны только продукты, отмеченные дома.</p>`}
     <div class="aim" style="margin-top:10px">
       <div class="aim-row"><span>Было по плану</span><b>${nf(aim)} ккал</b></div>
       <div class="aim-row"><span>Стало</span><b>${nf(tot.k)} ккал · Б ${Math.round(tot.p)} · Ж ${Math.round(tot.f)} · У ${Math.round(tot.c)}</b></div>
@@ -3208,13 +3376,16 @@ function qtySplit(V){
 const qtyLine = list => list.map(x => esc(word(x.n)) + ' ' + gOf(x)).join(', ');
 
 function mealRow(m, di, mi){
-  const V = mealView(di, mi), v = V.v, cls = TAG[V.label] || 'tg-ghost', nm = TAGN[V.label] || V.label;
+  /* у пропущенного приёма в счёт дня идёт ноль, а показываем то, что
+     он давал бы: иначе непонятно, чего именно день недосчитался */
+  const V = mealView(di, mi), v = V.skip ? V.plan : V.v;
+  const cls = TAG[V.label] || 'tg-ghost', nm = TAGN[V.label] || V.label;
   const key = di + '.' + mi, open = openSwap === key;
   const st = V.swapped && V.tplId ? stepsFor(dishById(V.tplId), V.items) : null;
-  return `<div class="meal${V.swapped ? ' sw' : ''}">
+  return `<div class="meal${V.swapped ? ' sw' : ''}${V.skip ? ' skipped' : ''}">
     ${donut(v.p,v.f,v.c,44,7)}
     <div>
-      <div class="meal-h"><h4>${esc(V.title)}</h4><span class="tag ${cls}">${nm}</span>${V.swapped ? '<span class="swapped-tag">замена</span>' : ''}</div>
+      <div class="meal-h"><h4>${esc(V.title)}</h4><span class="tag ${cls}">${nm}</span>${V.swapped ? '<span class="swapped-tag">замена</span>' : ''}${V.skip ? '<span class="skip-tag">пропущен</span>' : ''}</div>
       ${(() => {
         const sp = qtySplit(V);
         if(!sp.ok) return `<p class="qty">${esc(V.qty)}</p>`;
@@ -3228,12 +3399,15 @@ function mealRow(m, di, mi){
       <span class="macro-mini">
         <span class="mm mm-p">Б ${v.p}</span><span class="mm mm-f">Ж ${v.f}</span><span class="mm mm-c">У ${v.c}</span>
       </span>
-      <span class="kcal-b"><b>${nf(v.k)}</b><span>ккал</span></span>
-      <button type="button" class="swap-btn" data-swap="${key}" aria-expanded="${open}">${svg('swap')}Заменить</button>
-      <button type="button" class="swap-btn" data-edit="${key}" aria-expanded="${editKey === key}">${svg('plus')}Навеска</button>
+      <span class="kcal-b"><b>${nf(v.k)}</b><span>${V.skip ? 'не в счёт' : 'ккал'}</span></span>
     </div>
-    ${open ? swapPanel(di, mi) : ''}
-    ${editKey === key ? editPanel(di, mi) : ''}
+    <div class="meal-a">
+      ${V.skip ? '' : `<button type="button" class="swap-btn" data-swap="${key}" aria-expanded="${open}">${svg('swap')}Заменить</button>
+      <button type="button" class="swap-btn" data-edit="${key}" aria-expanded="${editKey === key}">${svg('plus')}Состав</button>`}
+      <button type="button" class="swap-btn" data-skip="${key}" aria-pressed="${!!V.skip}">${svg(V.skip ? 'plus' : 'x')}${V.skip ? 'Вернуть приём' : 'Пропустить'}</button>
+    </div>
+    ${!V.skip && open ? swapPanel(di, mi) : ''}
+    ${!V.skip && editKey === key ? editPanel(di, mi) : ''}
   </div>`;
 }
 function pageWeek(){
@@ -3263,6 +3437,15 @@ function pageWeek(){
   <div class="card sec">
     <div class="sec-h"><h2>Приёмы пищи</h2><span class="lbl">навеска для: ${person(who).name.toLowerCase()}</span></div>
     <div class="meals">${d.meals.map((m,mi) => mealRow(m, day, mi)).join('')}${drinkRow()}</div>
+    ${(() => {
+      const sk = d.meals.filter((_, mi) => skipped[swapKey(day, mi)]).length;
+      if(!sk) return '';
+      const lost = d.meals.reduce((a, _, mi) => {
+        const V = mealView(day, mi);
+        return a + (V.skip ? V.plan.k : 0);
+      }, 0);
+      return `<p class="verdict v-warn" style="margin-top:12px">Пропущен${sk === 1 ? "" : "о"} ${mealsWord(sk)} на ${nf(lost)} ккал: за день выходит ${nf(v.k)} вместо ${nf(tgt)}. Разовый пропуск ничего не решает — неделя считается суммой, а не по дням. Но если он повторяется, дыру лучше не оставлять: кнопка «Состав» добавляет продукт прямо в оставшиеся приёмы.</p>`;
+    })()}
     ${(() => {
       const b = Math.round(v.b || 0);
       if(b >= FIB.lo) return `<p class="verdict v-ok" style="margin-top:12px">Клетчатки за день ${b} г — коридор 25–30, и он выдержан. На дефиците её теряют первой: объём еды падает, а потребность остаётся.</p>`;
@@ -3315,12 +3498,24 @@ function batchDetails(r, m){
 
 function pairCard(P){
   const V = P.A.V, cls = TAG[V.label] || 'tg-ghost', nm = TAGN[V.label] || V.label;
-  if(!P.together){
+  if(P.skM && P.skW){
     return `<div class="item">
-      <div class="meal-h"><h4>Разные блюда</h4><span class="tag ${cls}">${nm}</span><span class="swapped-tag">готовится отдельно</span></div>
-      <p class="q"><b>Он</b> · ${esc(P.A.V.title)}, ${nf(P.A.V.v.k)} ккал<br>${esc(P.A.V.qty)}</p>
-      <p class="q"><b>Она</b> · ${esc(P.B.V.title)}, ${nf(P.B.V.v.k)} ккал<br>${esc(P.B.V.qty)}</p>
-      <p class="n">Кто-то поставил замену на этот приём, складывать нечего. Вернуть общее блюдо можно в «Неделе» кнопкой «Вернуть как в плане».</p>
+      <div class="meal-h"><h4>${esc(P.A.V.title)}</h4><span class="tag ${cls}">${nm}</span><span class="skip-tag">пропущен</span></div>
+      <p class="n">Этот приём пропускают оба — готовить и раскладывать нечего. Вернуть его можно в «Неделе» кнопкой «Вернуть приём».</p>
+    </div>`;
+  }
+  if(!P.together){
+    const one = P.skM || P.skW;
+    const line = (nm2, V2) => V2.skip
+      ? `<p class="q"><b>${nm2}</b> · пропускает этот приём</p>`
+      : `<p class="q"><b>${nm2}</b> · ${esc(V2.title)}, ${nf(V2.v.k)} ккал<br>${esc(V2.qty)}</p>`;
+    return `<div class="item">
+      <div class="meal-h"><h4>${one ? 'Готовим на одного' : 'Разные блюда'}</h4><span class="tag ${cls}">${nm}</span><span class="swapped-tag">${one ? 'без сложения' : 'готовится отдельно'}</span></div>
+      ${line('Он', P.A.V)}
+      ${line('Она', P.B.V)}
+      <p class="n">${one
+        ? 'Один пропускает приём, поэтому навески не складываются: готовится ровно одна порция — та, что выше.'
+        : 'Кто-то поставил замену на этот приём, складывать нечего. Вернуть общее блюдо можно в «Неделе» кнопкой «Вернуть как в плане».'}</p>
     </div>`;
   }
   const k = MUL(), st = pairSteps(P);
@@ -3347,7 +3542,7 @@ function pagePair(){
 
   const cards = d.meals.map((_, mi) => pairCard(pairMeal(day, mi)));
   const tm = dayTotals(day, 'm'), tw = dayTotals(day, 'w');
-  const both = tm.k + tw.k, sh = Math.round(tm.k / both * 100);
+  const both = tm.k + tw.k, sh = both > 0 ? Math.round(tm.k / both * 100) : 50;
   const D = pairDay(day), dr = pairDrinks();
   const apart = d.meals.filter((_, mi) => !pairMeal(day, mi).together).length;
   const k = MUL(), nd = PLAN.days[(day + 1) % PLAN.days.length];
@@ -3404,6 +3599,66 @@ function pagePair(){
   </div>`;
 }
 
+/* Правка заготовки: навеска, выход и то, что из этого следует для меню. */
+function recPanel(r){
+  const d = recDraft || { ing: r.ing.map(x => ({ n:x.n, g:x.g })), outG: r.outG };
+  const rows = d.ing.map((x, i) => {
+    const f = anyFood(x.n), unit = f && f.unit, v = sumOf([{ n:x.n, g:x.g }]);
+    return `<div class="comp">
+      <span><h5>${esc(word(x.n))}</h5><span class="s">${Math.round(v.k)} ккал · Б ${v.p.toFixed(1)} · Ж ${v.f.toFixed(1)} · У ${v.c.toFixed(1)}</span></span>
+      <span class="g"><input id="rg_${i}" type="number" min="0" max="${unit ? 40 : 5000}" step="${unit ? 1 : 10}" value="${inUnits(x.n, x.g)}"><s>${unit ? 'шт' : 'г'}</s></span>
+      <button type="button" class="del" data-rgoff="${i}" aria-label="Убрать ${esc(word(x.n))}">${svg('x')}</button>
+    </div>`;
+  }).join('');
+  const qq = recQ.trim().toLowerCase();
+  const has = n => d.ing.some(x => x.n === n);
+  const pool = allFoods().concat(Object.keys(BASE).map(n => ({ n })))
+    .filter(f => !has(f.n) && (qq ? (f.n + ' ' + word(f.n)).toLowerCase().indexOf(qq) >= 0 : !!pantry[f.n]))
+    .slice(0, 12);
+  const was = ORIG[r.key], now = recalcRecipe(was, d);
+  const mass = d.ing.reduce((a, x) => a + x.g, 0);
+  const used = mealsWithBatch(r.key), dk = now.per100.k - was.per100.k;
+  const num = x => String(x).replace('.', ',');
+  return `<div class="swp">
+    <span class="lbl">Навеска закладки<i></i></span>
+    <p class="s" style="font-size:11.5px;color:var(--ink3);margin-bottom:9px">Меняются граммы или выход — КБЖУ на 100 г считается заново, и следом едут все приёмы недели, где эта заготовка стоит. Правка живёт только в этом браузере.</p>
+    <div class="res-list">${rows}</div>
+    <span class="lbl" style="margin-top:12px">Добавить в закладку<i></i></span>
+    <input id="rq" class="swq" type="search" placeholder="Продукт: грибы, сметана, мука" value="${esc(recQ)}">
+    ${pool.length
+      ? `<div class="dish-pick" style="padding:0">${pool.map(f =>
+          `<button type="button" data-recadd="${esc(f.n)}">${esc(word(f.n))}</button>`).join('')}</div>`
+      : `<p class="s" style="font-size:11.5px;color:var(--ink3)">Ничего не нашлось${qq ? ' по запросу «' + esc(recQ) + '»' : ''}. Без запроса показаны продукты, отмеченные дома.</p>`}
+    <div class="aim" style="margin-top:10px">
+      <div class="aim-row"><span>Навеска сырого</span><b>${nf(mass)} г</b></div>
+      <div class="aim-row"><span>Выход готового</span><b><input id="rout" type="number" min="50" max="9000" step="50" value="${Math.round(d.outG)}"> г</b></div>
+      <div class="aim-row"><span>Было на 100 г</span><b>${was.per100.k} ккал · Б ${num(was.per100.p)} · Ж ${num(was.per100.f)} · У ${num(was.per100.c)}</b></div>
+      <div class="aim-row"><span>Станет на 100 г</span><b>${now.per100.k} ккал · Б ${num(now.per100.p)} · Ж ${num(now.per100.f)} · У ${num(now.per100.c)}</b></div>
+      <div class="aim-row"><span>В меню</span><b>${used ? mealsWord(used) + (dk ? ', сдвиг ' + (dk > 0 ? '+' : '−') + Math.abs(dk) + ' ккал на 100 г' : ', калорийность та же') : 'эта заготовка в меню не стоит'}</b></div>
+    </div>
+    ${now.per100.k > 700 ? '<p class="verdict v-warn" style="margin-top:10px">На 100 г выходит больше, чем у чистого масла, — почти наверняка занижен выход. У супа он больше навески за счёт воды, у запеканки меньше на выпаренную влагу, но не в разы.</p>' : ''}
+    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:10px">
+      <button type="button" class="btn" data-recsave="${esc(r.key)}">Сохранить</button>
+      <button type="button" class="btn btn-2" data-recclose="1">Отмена</button>
+      ${r.edited ? `<button type="button" class="btn btn-2" data-recreset="${esc(r.key)}">Вернуть исходный</button>` : ''}
+    </div>
+  </div>`;
+}
+/* вернулись к исходной навеске — правку не храним, чтобы «изменено» не
+   висело на заготовке, которая ничем от плановой не отличается */
+const sameAsPlan = (r0, ing, outG) => outG === r0.outG && ing.length === r0.ing.length &&
+  ing.every((x, i) => x.n === r0.ing[i].n && Math.round(x.g) === r0.ing[i].g);
+function saveRecipe(){
+  const ing = recDraft.ing.filter(x => x.g > 0).map(x => ({ n:x.n, g:Math.round(x.g) }));
+  const outG = Math.max(50, Math.round(recDraft.outG || 0));
+  const r0 = ORIG[recKey];
+  if(!ing.length || sameAsPlan(r0, ing, outG)) delete recEdit[recKey];
+  else recEdit[recKey] = { ing, outG };
+  store.set('kotel.recipes', recEdit);
+  rebuildRecipes();
+  recKey = null; recDraft = null; recQ = '';
+}
+
 function pageRecipes(){
   const MEALS = ['Все', 'Завтрак', 'Обед', 'Ужин', 'Перекус'];
   const list = DISHES.filter(t => recMeal === 'Все' || t.meals.indexOf(recMeal) >= 0);
@@ -3446,14 +3701,14 @@ function pageRecipes(){
     <div class="grid" style="gap:9px">${dishCards}</div>
   </div>
   <div class="card sec">
-    <div class="sec-h"><h2>Заготовки на неделю</h2><span class="lbl">${PLAN.recipes.length} штук</span></div>
-    <p class="lead" style="margin-bottom:14px">Это то, что готовится впрок по графику и живёт по два дня. КБЖУ посчитано из навески и выхода — именно эти цифры стоят в порциях меню.</p>
-    <div class="grid" style="gap:9px">${PLAN.recipes.map((r, i) => {
-      const p = r.pw > 0;
-      return `<details class="rec"${i === openRec ? ' open' : ''}>
+    <div class="sec-h"><h2>Заготовки на неделю</h2><span class="lbl">${RECIPES.length} штук</span></div>
+    <p class="lead" style="margin-bottom:14px">Это то, что готовится впрок по графику и живёт по два дня. КБЖУ посчитано из навески и выхода — именно эти цифры стоят в порциях меню. Навеску можно поправить под себя: меню пересчитается следом.</p>
+    <div class="grid" style="gap:9px">${RECIPES.map((r, i) => {
+      const p = r.pw > 0, edit = recKey === r.key, was = ORIG[r.key];
+      return `<details class="rec"${i === openRec || edit ? ' open' : ''}>
         <summary class="rec-h">
           ${donut(r.per100.p, r.per100.f, r.per100.c, 44, 7)}
-          <span><h4>${esc(r.title)}</h4><span class="g">${esc(r.gear)}</span></span>
+          <span><h4>${esc(r.title)}${r.edited ? ' <span class="swapped-tag">изменено</span>' : ''}</h4><span class="g">${esc(r.gear)}</span></span>
           <span class="mm mm-p">${r.per100.k} ккал/100 г</span>
           ${svg('chev', 'chev')}
         </summary>
@@ -3467,7 +3722,10 @@ function pageRecipes(){
           ${p ? `<span class="fx">Её порция ${r.pw} г<b>${r.vw.k} ккал · Б ${r.vw.p}</b></span>
               <span class="fx">Его порция ${r.pm} г<b>${r.vm.k} ккал · Б ${r.vm.p}</b></span>` : ''}
           <span class="hint">${esc(r.hint)}</span>
+          ${r.edited ? `<span class="fx">Было<b>${was.per100.k} ккал/100 г · выход ${yieldTxt(was.outG)}</b></span>` : ''}
+          <button type="button" class="btn btn-2" data-recedit="${esc(r.key)}">${edit ? 'Свернуть правку' : 'Изменить состав'}</button>
         </div>
+        ${edit ? recPanel(r) : ''}
       </details>`;
     }).join('')}</div>
   </div>`;
@@ -3536,10 +3794,10 @@ function rail(){
   <div class="card sec">
     <div class="sec-h"><h2>Сегодня в плане</h2><span class="lbl">${esc(d.name)}</span></div>
     <div class="mini">${d.meals.slice(0,4).map((m,mi)=>{
-      const V=mealView(TODAY,mi), v=V.v;
+      const V=mealView(TODAY,mi), v=V.skip?V.plan:V.v;
       return `<div class="mini-row">${donut(v.p,v.f,v.c,34,6)}
-        <span><h5>${esc(V.title)}</h5><span class="s">${(TAGN[V.label]||V.label)}${V.swapped?' · замена':''}</span></span>
-        <span class="kk">${nf(v.k)}</span></div>`;
+        <span><h5>${esc(V.title)}</h5><span class="s">${(TAGN[V.label]||V.label)}${V.skip?' · пропущен':V.swapped?' · замена':''}</span></span>
+        <span class="kk">${V.skip?'—':nf(v.k)}</span></div>`;
     }).join('')}</div>
   </div>
   <div class="card sec">
@@ -3586,8 +3844,9 @@ document.addEventListener('click', e=>{
     const nn = r.moved === 1 ? 'блюдо' : r.moved < 5 ? 'блюда' : 'блюд';
     syncNote = r.moved
       ? 'Перенесено ' + r.moved + ' ' + nn + (r.cleared ? ', ещё ' + r.cleared + ' вернулось к плану' : '') +
+        (r.skips ? ', пропуски тоже перенесены' : '') +
         '. У ' + AT[r.dst] + ' теперь тот же состав, а навеска пересчитана под ' + POSS[r.dst] + ' норму: ' + nf(t.k) + ' ккал за день.'
-      : 'Замен в этом дне нет — день у ' + AT[r.dst] + ' вернулся к плану: ' + nf(t.k) + ' ккал.';
+      : 'Замен в этом дне нет — день у ' + AT[r.dst] + ' вернулся к плану' + (r.skips ? ', пропуски перенесены' : '') + ': ' + nf(t.k) + ' ккал.';
     render(); return;
   }
   const gt = e.target.closest('[data-goto]');
@@ -3650,6 +3909,48 @@ document.addEventListener('click', e=>{
   const es = e.target.closest('[data-edsave]');
   if(es){ const [a, b] = es.dataset.edsave.split('.').map(Number); editSave(a, b); render(); return; }
   if(e.target.closest('[data-edclose]')){ editKey = null; editDraft = null; render(); return; }
+  const ea = e.target.closest('[data-edadd]');
+  if(ea && editDraft){
+    const n = ea.dataset.edadd;
+    if(!editDraft.some(x => x.n === n)) editDraft.push({ n, g: defG(n), off:false });
+    render(); return;
+  }
+  const skb = e.target.closest('[data-skip]');
+  if(skb){
+    const [a, b] = skb.dataset.skip.split('.').map(Number);
+    toggleSkip(a, b);
+    editKey = null; editDraft = null; openSwap = null;
+    render(); return;
+  }
+  const re = e.target.closest('[data-recedit]');
+  if(re){
+    const k = re.dataset.recedit;
+    if(recKey === k){ recKey = null; recDraft = null; }
+    else {
+      const r = RECIPE[k];
+      recKey = k; recQ = '';
+      recDraft = { ing: r.ing.map(x => ({ n:x.n, g:x.g })), outG: r.outG };
+    }
+    render(); return;
+  }
+  const rgo = e.target.closest('[data-rgoff]');
+  if(rgo && recDraft){ recDraft.ing.splice(+rgo.dataset.rgoff, 1); render(); return; }
+  const rad = e.target.closest('[data-recadd]');
+  if(rad && recDraft){
+    const n = rad.dataset.recadd;
+    if(!recDraft.ing.some(x => x.n === n)) recDraft.ing.push({ n, g: defG(n) });
+    render(); return;
+  }
+  if(e.target.closest('[data-recsave]') && recDraft && recKey){ saveRecipe(); render(); return; }
+  if(e.target.closest('[data-recclose]')){ recKey = null; recDraft = null; render(); return; }
+  const rrs = e.target.closest('[data-recreset]');
+  if(rrs){
+    delete recEdit[rrs.dataset.recreset];
+    store.set('kotel.recipes', recEdit);
+    rebuildRecipes();
+    recKey = null; recDraft = null;
+    render(); return;
+  }
   const sdh = e.target.closest('[data-swapdish]');
   if(sdh){
     const [d0, m0, id] = sdh.dataset.swapdish.split('.');
@@ -3777,6 +4078,23 @@ document.addEventListener('input', e=>{
     if(el){ el.focus(); try { el.setSelectionRange(pos, pos); } catch(err){} }
     return;
   }
+  if(/^rg_\d+$/.test(e.target.id) && recDraft){
+    const i = +e.target.id.slice(3), it = recDraft.ing[i];
+    if(it){
+      const v = parseFloat(String(e.target.value).replace(',', '.'));
+      it.g = isNaN(v) || v < 0 ? 0 : Math.round(v * stepOf(it.n));
+      keepCaret(e.target);
+    }
+    return;
+  }
+  if(e.target.id === 'rout' && recDraft){
+    const v = parseFloat(String(e.target.value).replace(',', '.'));
+    recDraft.outG = isNaN(v) || v < 50 ? 50 : Math.round(v);
+    keepCaret(e.target);
+    return;
+  }
+  if(e.target.id === 'rq'){ recQ = e.target.value; keepCaret(e.target); return; }
+  if(e.target.id === 'edq'){ edQ = e.target.value; keepCaret(e.target); return; }
   if(e.target.id === 'swq'){
     swapQ = e.target.value;
     const pos = e.target.selectionStart;
