@@ -1985,6 +1985,60 @@ const probe = `
   console.log('проблем со списком покупок:', sp2);
   }
 
+  { // расход заготовок по дням
+  let bf = 0;
+  profiles = {}; swaps = {}; skipped = {}; eaten = {}; custom = []; recEdit = {};
+  rebuildFood(); rebuildRecipes();
+  who = 'm'; day = 0;
+
+  const F = batchFlow();
+  if (F.length < 5) { bf++; console.log('  заготовок в расходе подозрительно мало:', F.length); }
+  for (const b of F) {
+    if (!RECIPE[b.n]) { bf++; console.log('  в расходе не заготовка:', b.n); }
+    if (b.first < 0) { bf++; console.log('  заготовка без дня готовки:', b.n); }
+    if (!b.line.length) { bf++; console.log('  заготовка без расхода:', b.n); }
+    // остаток убывает и не уходит в минус
+    let prev = b.out + 1;
+    for (const x of b.line) {
+      if (x.left > prev) { bf++; console.log('  остаток вырос сам по себе:', b.n, PLAN.days[x.di].name); }
+      if (x.left < 0) { bf++; console.log('  остаток ушёл в минус:', b.n); }
+      if (x.di < b.first) { bf++; console.log('  расход раньше готовки:', b.n); }
+      prev = x.left;
+    }
+    // сумма расхода плюс остаток равна тому, что приготовили
+    const eat = b.line.reduce((a, x) => a + x.g, 0);
+    if (Math.abs(eat + b.left - b.out) > 1) { bf++; console.log('  съеденное и остаток не дают закладку:', b.n, Math.round(eat), Math.round(b.left), b.out); }
+    if (Math.abs(eat - b.total) > 1) { bf++; console.log('  расход по дням не сходится с итогом:', b.n); }
+  }
+
+  // пропуск дня уменьшает расход именно этой заготовки
+  {
+    const one = F[0], di = one.line[0].di;
+    const wasG = one.line[0].g;
+    for (let mi = 0; mi < PLAN.days[di].meals.length; mi++)
+      for (const kk of ['m', 'w']) toggleSkip(di, mi, kk);
+    const F2 = batchFlow().find(x => x.n === one.n);
+    const nowG = F2 && F2.line.find(x => x.di === di);
+    if (nowG && nowG.g >= wasG) { bf++; console.log('  пропуск дня не убрал расход заготовки'); }
+    skipped = {};
+    const F3 = batchFlow().find(x => x.n === one.n);
+    if (Math.abs(F3.total - one.total) > 1) { bf++; console.log('  расход не вернулся после отмены пропусков'); }
+  }
+
+  // страница рисуется и говорит про остаток
+  page = 'cook';
+  const hc = pageCook();
+  if (bad(hc).length) { bf++; console.log('  ПРОБЛЕМА страницы готовки:', bad(hc).join(',')); }
+  if (hc.indexOf('Что остаётся в форме') < 0) { bf++; console.log('  нет карточки остатков'); }
+  if (hc.indexOf('варится к ') < 0) { bf++; console.log('  не сказано, когда варить'); }
+  // дательный падеж дню недели
+  for (const w2 of ['понедельник ·', 'среда ·', 'воскресенье ·']) {
+    if (hc.indexOf('варится к ' + w2) >= 0) { bf++; console.log('  день недели в именительном:', w2); }
+  }
+  page = 'home';
+  console.log('проблем с расходом заготовок:', bf);
+  }
+
   console.log('сегодня по календарю: индекс ' + TODAY + ' -> ' + PLAN.days[TODAY].name);
 })();
 `;

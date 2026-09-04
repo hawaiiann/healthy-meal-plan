@@ -3287,7 +3287,7 @@ const SUBS = {
   recipes:'Все блюда конструктора и заготовки, которые готовятся впрок',
   snacks:'Взаимозаменяемые перекусы и ежедневный слот сладкого',
   drinks:'Кофе с молоком тоже считается — здесь он попадает в бюджет дня',
-  cook:'Одна большая закладка и короткие вечерние — что и когда',
+  cook:'Одна большая закладка в воскресенье, короткие вечерние — и сколько чего остаётся в форме',
   shop:'Посчитано из вашей недели на двоих: замены, пропуски и личные нормы уже учтены',
   profile:'Нормы пересчитываются от текущего веса — параметры хранятся только в этом браузере',
   notes:'Допущения, замены и то, на что смотреть через три недели'
@@ -3941,6 +3941,34 @@ function pageSnacks(){
   </div>`;
 }
 
+/* Заготовка «живёт два дня» — а сколько её осталось в форме сегодня, не
+   знал никто. Считаем расход по дням: когда варится, сколько уходит в
+   каждый день недели и что остаётся после. День готовки — первый день,
+   когда заготовка появляется в меню: раньше её готовить незачем. */
+function batchFlow(){
+  const use = {};
+  for(let di = 0; di < PLAN.days.length; di++)
+    PLAN.days[di].meals.forEach((_, mi) => pairMeal(di, mi).rows.forEach(r => {
+      if(!RECIPE[r.n]) return;
+      (use[r.n] = use[r.n] || PLAN.days.map(() => 0))[di] += r.g;
+    }));
+  return Object.keys(use).map(n => {
+    const rc = RECIPE[n], days = use[n];
+    const first = days.findIndex(g => g > 0);
+    const total = days.reduce((a, b) => a + b, 0);
+    const one = rc.outG || 1000;
+    const times = Math.max(1, Math.ceil(total / one - 0.05));
+    let left = one * times;
+    const line = [];
+    days.forEach((g, i) => {
+      if(i < first || g <= 0) return;
+      left -= g;
+      line.push({ di:i, g, left: Math.max(0, left) });
+    });
+    return { n, total, times, first, line, out: one * times, left: Math.max(0, left) };
+  }).filter(x => x.first >= 0).sort((a, b) => a.first - b.first || b.total - a.total);
+}
+
 function pageCook(){
   return `<div class="card sec">
     <div class="sec-h"><h2>График готовки</h2><span class="lbl">активное время у плиты</span></div>
@@ -3948,7 +3976,30 @@ function pageCook(){
     <div class="cook-l">${COOK.map(([d,s,t,key,txt])=>
       `<div class="cook-i${key?' key':''}"><span class="dd">${d}<small>${s}</small></span>
        <p>${txt}<br><span class="num" style="font-size:11px;color:var(--ink3)">${t} активных</span></p></div>`).join('')}</div>
-  </div>`;
+  </div>
+  ${(() => {
+    const F = batchFlow();
+    if(!F.length) return '';
+    const nd = i => esc(PLAN.days[i].name);
+    /* «варится к понедельник» — дательный падеж дню недели: -а меняется на
+       -е, -е на -ю, остальные получают -у */
+    const dat = i => { const t = PLAN.days[i].name.toLowerCase();
+      return esc(/а$/.test(t) ? t.slice(0, -1) + "е" : /е$/.test(t) ? t.slice(0, -1) + "ю" : t + "у"); };
+    return `<div class="card sec">
+      <div class="sec-h"><h2>Что остаётся в форме</h2><span class="lbl">${F.length} заготовок · на двоих</span></div>
+      <p class="lead" style="margin-bottom:14px">Заготовка живёт два дня, но сколько её осталось после вчерашнего ужина — вопрос, на который до сих пор отвечала только память. Здесь расход по дням: обе порции сложены, дни ваши, с учётом замен и пропусков.</p>
+      <div class="grid" style="gap:9px">${F.map(b => `<div class="item">
+        <div class="meal-h"><h4>${esc(cap(word(b.n)))}</h4><span class="lbl">варится к ${dat(b.first)} · ${b.times > 1 ? b.times + ' закладки, ' : ''}${esc(yieldTxt(b.out))}</span></div>
+        <div class="split">
+          <div class="sh"><span>День</span><b>Уходит</b><i>Останется</i></div>
+          ${b.line.map(x => `<div><span>${nd(x.di)}</span><b>${nf(x.g)} г</b><i>${x.left > 0 ? nf(x.left) + ' г' : '—'}</i></div>`).join('')}
+        </div>
+        ${b.left > b.out * 0.2
+          ? `<p class="n">После недели остаётся ${nf(b.left)} г — это ${Math.round(b.left / b.out * 100)}% закладки. В морозилку или готовить меньше.</p>`
+          : b.left > 0 ? `<p class="n">Остаётся ${nf(b.left)} г — почти ровно.</p>` : `<p class="n">Уходит без остатка.</p>`}
+      </div>`).join('')}</div>
+    </div>`;
+  })()}`;
 }
 
 function pageShop(){
