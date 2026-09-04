@@ -1344,6 +1344,83 @@ const probe = `
   console.log('проблем с прогулками:', wl);
   }
 
+  { // правка навески и отказ от ингредиента
+  let ed2 = 0;
+  profiles = {}; swaps = {}; custom = []; rebuildFood(); who = 'm'; day = 0;
+  gymDays = PLAN.days.map(d => !!d.gym);
+
+  // заготовка в приёме должна считаться, иначе правка обнулила бы его
+  {
+    const v = sumOf([{ n:'суп-гуляш', g:400 }]);
+    if (!(v.k > 100)) { ed2++; console.log('  заготовка не считается в сумме:', v.k); }
+  }
+
+  const kBefore = mealView(0, 2).v.k, dBefore = dayTotals(0).k;
+  editOpen(0, 2);
+  if (!editDraft || !editDraft.length) { ed2++; console.log('  черновик не собрался'); }
+  else {
+    const sum = sumOf(editDraft.map(x => ({ n:x.n, g:x.g })));
+    if (Math.abs(sum.k - kBefore) > 3) { ed2++; console.log('  черновик не совпал с приёмом:', Math.round(sum.k), kBefore); }
+
+    // положили в полтора раза больше
+    editDraft[0].g = Math.round(editDraft[0].g * 1.5);
+    editSave(0, 2);
+    const kMore = mealView(0, 2).v.k;
+    if (!(kMore > kBefore)) { ed2++; console.log('  увеличенная навеска не увеличила приём:', kBefore, kMore); }
+    if (Math.abs(dayTotals(0).k - (dBefore + kMore - kBefore)) > 3) { ed2++; console.log('  итог дня не пересчитался'); }
+
+    // один продукт не учитываем
+    editOpen(0, 2);
+    const last = editDraft.length - 1;
+    const dropped = editDraft[last].n;
+    const kept = editDraft.filter((x, i) => i !== last).map(x => x.n);
+    editDraft[last].off = true;
+    editSave(0, 2);
+    const V = mealView(0, 2);
+    if (V.qty.indexOf(word(dropped)) >= 0) { ed2++; console.log('  снятый продукт остался в приёме:', dropped); }
+    for (const nm of kept) if (V.qty.indexOf(word(nm)) < 0) { ed2++; console.log('  оставленный продукт пропал:', nm); }
+    if (!(V.v.k < kMore)) { ed2++; console.log('  снятый продукт не убавил калории:', kMore, V.v.k); }
+
+    // снять всё — приём возвращается к плану
+    editOpen(0, 2);
+    editDraft.forEach(x => { x.off = true; });
+    editSave(0, 2);
+    if (Math.abs(mealView(0, 2).v.k - kBefore) > 3) { ed2++; console.log('  полный отказ не вернул план:', mealView(0, 2).v.k, kBefore); }
+  }
+  dropSwap(0, 2);
+  if (Math.abs(mealView(0, 2).v.k - kBefore) > 1) { ed2++; console.log('  возврат к плану не сработал'); }
+  if (Math.abs(dayTotals(0).k - dBefore) > 1) { ed2++; console.log('  день не вернулся'); }
+
+  // штучные продукты правятся штуками
+  if (stepOf('яйцо') !== 55) { ed2++; console.log('  шаг штучного продукта не тот:', stepOf('яйцо')); }
+  if (stepOf('суп-гуляш') !== 1) { ed2++; console.log('  весовой продукт должен иметь шаг 1'); }
+  if (inUnits('яйцо', 110) !== 2) { ed2++; console.log('  граммы не перевелись в штуки:', inUnits('яйцо', 110)); }
+
+  // разметка
+  editKey = null; editDraft = null;
+  if (pageWeek().indexOf('data-edit') < 0) { ed2++; console.log('  нет кнопки правки навески'); }
+  editOpen(0, 2);
+  const hEd = pageWeek();
+  if (hEd.indexOf('Сколько положили на самом деле') < 0) { ed2++; console.log('  панель правки не открылась'); }
+  if (hEd.indexOf('id="ed_0"') < 0) { ed2++; console.log('  нет поля ввода веса'); }
+  if (hEd.indexOf('data-edoff') < 0) { ed2++; console.log('  нет кнопки «не учитывать»'); }
+  if (bad(hEd).length) { ed2++; console.log('  ПРОБЛЕМА отрисовки панели правки:', bad(hEd).join(',')); }
+  editKey = null; editDraft = null;
+
+  // в конструкторе вес вписывается
+  for (const f of allFoods()) pantry[f.n] = true;
+  aimMeal = 'Обед';
+  const rc = assembleDish('Обед', 'skillet');
+  if (rc) {
+    built = rc.items; builtTpl = rc.tpl;
+    const hc = pageCons();
+    if (hc.indexOf('id="cg_0"') < 0) { ed2++; console.log('  нет поля веса в конструкторе'); }
+    if (bad(hc).length) { ed2++; console.log('  ПРОБЛЕМА отрисовки конструктора:', bad(hc).join(',')); }
+  }
+  built = []; builtTpl = null; swaps = {};
+  console.log('проблем с правкой навески:', ed2);
+  }
+
   console.log('сегодня по календарю: индекс ' + TODAY + ' -> ' + PLAN.days[TODAY].name);
 })();
 `;

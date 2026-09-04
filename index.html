@@ -477,6 +477,11 @@ summary::-webkit-details-marker{display:none}
 .sub-h{margin:16px 0 7px; font-family:Nunito,sans-serif; font-size:10px; font-weight:700;
   letter-spacing:.1em; text-transform:uppercase; color:var(--ink3)}
 .sub-h:first-of-type{margin-top:2px}
+.comp.off{opacity:.55}
+.comp.off h5{text-decoration:line-through}
+.comp .g input{width:62px; padding:5px 7px; border-radius:7px; border:1px solid var(--line2); background:var(--card);
+  color:var(--ink); font-family:"JetBrains Mono",monospace; font-size:12.5px; text-align:right}
+.comp .g s{text-decoration:none; font-size:11px; color:var(--ink3)}
 .swq{width:100%; padding:8px 11px; margin-bottom:9px; border-radius:9px; border:1px solid var(--line-c);
   background:var(--field); color:var(--ink); font-size:12.5px; font-family:inherit}
 .swq::placeholder{color:var(--ink3)}
@@ -765,6 +770,11 @@ let consPair = store.get('kotel.conspair', true) !== false;
 let syncNote = '';
 let outNote = null;   /* кончившийся продукт и что с ним делать */
 let swapQ = '';       /* фильтр по блюдам и продуктам в панели замены */
+/* Правка навески: положили больше или меньше, чем в плане, или вовсе
+   не положили. Черновик живёт до «Сохранить», а сохраняется той же
+   заменой — состав тот же, меняются только граммы. */
+let editKey = null;
+let editDraft = null;
 
 /* Дневник съеденного. План есть, факта нет — и через месяц непонятно,
    почему вес стоит: то ли план не работает, то ли по нему никто не жил.
@@ -1021,7 +1031,9 @@ function aimFor(meal, k){
 }
 function sumOf(list){
   return list.reduce((a, x) => {
-    const f = FOOD[x.n]; if(!f) return a;
+    /* в приёме может стоять заготовка — «суп-гуляш 395 г». В кладовке
+       её нет, но КБЖУ у неё есть, иначе правка навески обнулила бы приём. */
+    const f = anyFood(x.n); if(!f) return a;
     a.k += f.k * x.g / 100; a.p += f.p * x.g / 100; a.f += f.f * x.g / 100; a.c += f.c * x.g / 100;
     a.b += (f.b || 0) * x.g / 100;
     return a;
@@ -2419,7 +2431,7 @@ function pageCons(){
     const f = FOOD[x.n], v = { k: f.k*x.g/100, p: f.p*x.g/100, f: f.f*x.g/100, c: f.c*x.g/100 };
     return `<div class="comp">
       <span><h5>${esc(x.n)}</h5><span class="s">${f.unit ? x.g+' г · ' : ''}${Math.round(v.k)} ккал · Б ${v.p.toFixed(1)} · Ж ${v.f.toFixed(1)} · У ${v.c.toFixed(1)}</span></span>
-      <span class="g"><button type="button" data-g="${i}:-">−</button><b>${f.unit ? Math.round(x.g/f.unit)+' шт' : x.g+' г'}</b><button type="button" data-g="${i}:+">+</button></span>
+      <span class="g"><button type="button" data-g="${i}:-">−</button><input id="cg_${i}" type="number" min="0" max="${f.unit ? 20 : 2000}" step="${f.unit ? 1 : 5}" value="${f.unit ? Math.round(x.g/f.unit) : x.g}"><s>${f.unit ? 'шт' : 'г'}</s><button type="button" data-g="${i}:+">+</button></span>
       <button type="button" class="del" data-g="${i}:x" aria-label="Убрать ${esc(x.n)}">${svg('x')}</button>
     </div>`;
   };
@@ -3032,6 +3044,56 @@ function dishHit(t, qq){
   return hay.indexOf(qq) >= 0;
 }
 
+function editOpen(di, mi){
+  const V = mealView(di, mi);
+  const parts = (V.items && V.items.length) ? V.items : splitParts(V.qty);
+  editKey = di + '.' + mi;
+  editDraft = parts.map(x => ({ n:x.n, g:x.g, r:x.r, side:!!x.side, off:false }));
+}
+function editSave(di, mi){
+  const V = mealView(di, mi);
+  const items = (editDraft || []).filter(x => !x.off && x.g > 0)
+    .map(x => ({ n:x.n, g:x.g, r:x.r, side:x.side }));
+  if(!items.length){ dropSwap(di, mi); }
+  else applySwap(di, mi, { title: V.title, note: V.note || '', tplId: V.tplId || null, items });
+  editKey = null; editDraft = null;
+}
+/* шаг ввода: штучные продукты правятся штуками, остальные граммами */
+const stepOf = n => { const f = anyFood(n); return (f && f.unit) || 1; };
+const inUnits = (n, g) => Math.round(g / stepOf(n) * 10) / 10;
+
+function editPanel(di, mi){
+  const V = mealView(di, mi);
+  const tot = sumOf((editDraft || []).filter(x => !x.off && x.g > 0));
+  const aim = V.v.k;
+  const rows = (editDraft || []).map((x, i) => {
+    const f = anyFood(x.n), unit = f && f.unit;
+    const v = sumOf([{ n:x.n, g:x.g }]);
+    return `<div class="comp${x.off ? ' off' : ''}">
+      <span><h5>${esc(word(x.n))}</h5><span class="s">${x.off ? 'не учитывается' : Math.round(v.k) + ' ккал · Б ' + v.p.toFixed(1) + ' · Ж ' + v.f.toFixed(1) + ' · У ' + v.c.toFixed(1)}</span></span>
+      <span class="g"><input id="ed_${i}" type="number" min="0" max="${unit ? 20 : 2000}" step="${unit ? 1 : 5}"
+        value="${x.off ? '' : inUnits(x.n, x.g)}"${x.off ? ' disabled' : ''}><s>${unit ? 'шт' : 'г'}</s></span>
+      <button type="button" class="del" data-edoff="${i}" aria-pressed="${x.off}" aria-label="${x.off ? 'Вернуть' : 'Не учитывать'} ${esc(word(x.n))}">${svg(x.off ? 'plus' : 'x')}</button>
+    </div>`;
+  }).join('');
+  const d = Math.round(tot.k - aim);
+  return `<div class="swp">
+    <span class="lbl">Сколько положили на самом деле<i></i></span>
+    <p class="s" style="font-size:11.5px;color:var(--ink3);margin-bottom:9px">Впишите свой вес — крестик убирает продукт из счёта, не трогая остальные. Итог дня пересчитается сразу.</p>
+    <div class="res-list">${rows}</div>
+    <div class="aim" style="margin-top:10px">
+      <div class="aim-row"><span>Было по плану</span><b>${nf(aim)} ккал</b></div>
+      <div class="aim-row"><span>Стало</span><b>${nf(tot.k)} ккал · Б ${Math.round(tot.p)} · Ж ${Math.round(tot.f)} · У ${Math.round(tot.c)}</b></div>
+      <div class="aim-row"><span>Разница</span><b>${Math.abs(d) < 5 ? 'столько же' : (d > 0 ? '+' : '−') + nf(Math.abs(d)) + ' ккал'}</b></div>
+    </div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:10px">
+      <button type="button" class="btn" data-edsave="${di}.${mi}">Сохранить</button>
+      <button type="button" class="btn btn-2" data-edclose="1">Отмена</button>
+      ${V.swapped ? '<button type="button" class="btn btn-2" data-undo="' + di + '.' + mi + '">Вернуть как в плане</button>' : ''}
+    </div>
+  </div>`;
+}
+
 function swapPanel(di, mi){
   const O = swapOptions(di, mi);
   const cur = mealView(di, mi);
@@ -3142,8 +3204,10 @@ function mealRow(m, di, mi){
       </span>
       <span class="kcal-b"><b>${nf(v.k)}</b><span>ккал</span></span>
       <button type="button" class="swap-btn" data-swap="${key}" aria-expanded="${open}">${svg('swap')}Заменить</button>
+      <button type="button" class="swap-btn" data-edit="${key}" aria-expanded="${editKey === key}">${svg('plus')}Навеска</button>
     </div>
     ${open ? swapPanel(di, mi) : ''}
+    ${editKey === key ? editPanel(di, mi) : ''}
   </div>`;
 }
 function pageWeek(){
@@ -3544,6 +3608,22 @@ document.addEventListener('click', e=>{
     if(!r) consNote = 'Из отмеченных продуктов не собирается ни одно блюдо для этого приёма. Отметьте больше — хотя бы мясо или творог, овощ и гарнир.';
     render(); return;
   }
+  const ed = e.target.closest('[data-edit]');
+  if(ed){
+    const k = ed.dataset.edit;
+    if(editKey === k){ editKey = null; editDraft = null; }
+    else { const [a, b] = k.split('.').map(Number); editOpen(a, b); openSwap = null; }
+    render(); return;
+  }
+  const eo = e.target.closest('[data-edoff]');
+  if(eo && editDraft){
+    const i = +eo.dataset.edoff;
+    editDraft[i].off = !editDraft[i].off;
+    render(); return;
+  }
+  const es = e.target.closest('[data-edsave]');
+  if(es){ const [a, b] = es.dataset.edsave.split('.').map(Number); editSave(a, b); render(); return; }
+  if(e.target.closest('[data-edclose]')){ editKey = null; editDraft = null; render(); return; }
   const sdh = e.target.closest('[data-swapdish]');
   if(sdh){
     const [d0, m0, id] = sdh.dataset.swapdish.split('.');
@@ -3648,6 +3728,29 @@ function clearQuery(){
 }
 document.addEventListener('input', e=>{
   if(e.target.id === 'q'){ query = e.target.value; render(); }
+  if(/^cg_\d+$/.test(e.target.id)){
+    const i = +e.target.id.slice(3), it = built[i];
+    if(it){
+      const v = parseFloat(String(e.target.value).replace(',', '.'));
+      const f = FOOD[it.n];
+      it.g = isNaN(v) || v < 0 ? 0 : Math.round(v * ((f && f.unit) || 1));
+      const pos = e.target.selectionStart, id = e.target.id;
+      render();
+      const el = document.getElementById(id);
+      if(el){ el.focus(); try { el.setSelectionRange(pos, pos); } catch(err){} }
+    }
+    return;
+  }
+  if(/^ed_\d+$/.test(e.target.id) && editDraft){
+    const i = +e.target.id.slice(3);
+    const v = parseFloat(String(e.target.value).replace(',', '.'));
+    editDraft[i].g = isNaN(v) || v < 0 ? 0 : Math.round(v * stepOf(editDraft[i].n));
+    const pos = e.target.selectionStart, id = e.target.id;
+    render();
+    const el = document.getElementById(id);
+    if(el){ el.focus(); try { el.setSelectionRange(pos, pos); } catch(err){} }
+    return;
+  }
   if(e.target.id === 'swq'){
     swapQ = e.target.value;
     const pos = e.target.selectionStart;
