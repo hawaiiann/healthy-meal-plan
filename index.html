@@ -915,7 +915,35 @@ function scaleQty(text, f){
     return (unit === 'шт' ? Math.max(1, Math.round(v)) : Math.max(5, Math.round(v / 5) * 5)) + ' ' + unit;
   });
 }
-const targetFor = (k, dayId) => Math.round(PLAN.targets[k][dayId] * scaleOf(k) / 5) * 5;
+/* Дни зала в плане стояли жёстко: понедельник, среда, пятница. Ходят
+   люди не по расписанию плана, поэтому дни выбираются, а цели дня
+   пересчитываются так, чтобы недельное среднее осталось прежним.
+   Разница между днём зала и днём без него — та же, что была в плане. */
+const GYM_SPREAD = { m:170, w:150 };
+let gymDays = store.get('kotel.gym', null);
+if(!Array.isArray(gymDays) || gymDays.length !== PLAN.days.length)
+  gymDays = PLAN.days.map(d => !!d.gym);
+const isGym = di => !!gymDays[di];
+const gymCount = () => gymDays.filter(Boolean).length;
+function setGym(di, on){
+  gymDays = gymDays.slice();
+  gymDays[di] = !!on;
+  store.set('kotel.gym', gymDays);
+}
+/* цель дня: среднее недели плюс-минус половина разницы, разнесённая по
+   числу тренировок — при любом их количестве неделя сходится в среднее */
+function baseTarget(k, di){
+  const n = gymCount(), avg = PLAN.people[k].kcal, sp = GYM_SPREAD[k] || 0;
+  if(n === 0 || n === PLAN.days.length) return avg;
+  const high = avg + sp * (PLAN.days.length - n) / PLAN.days.length;
+  return isGym(di) ? high : high - sp;
+}
+const dayIndex = dayId => PLAN.days.findIndex(d => d.id === dayId);
+const targetFor = (k, dayId) => {
+  const di = dayIndex(dayId);
+  const base = di < 0 ? PLAN.targets[k][dayId] : baseTarget(k, di);
+  return Math.round(base * scaleOf(k) / 5) * 5;
+};
 
 /* ================= напитки =================
    Кофе с молоком дважды в день — это 60–150 ккал, и на дефиците они
@@ -2664,6 +2692,11 @@ function pageProfile(){
   <div class="card sec">
     <div class="sec-h"><h2>Мои параметры</h2><span class="lbl">только в этом браузере</span></div>
     <p class="lead" style="margin-bottom:14px">Вес меняется — меняется и поддержка, и норма белка. Похудели на 5 кг: поддержка упала примерно на 60 ккал, и прежний дефицит стал меньше, чем кажется. Заполните поля — норма пересчитается, а вместе с ней и навески во всём меню. Пусто — работают базовые цифры плана.</p>
+    <h5 class="sub-h" style="margin-top:2px">Дни зала</h5>
+    <p class="lead" style="margin-bottom:10px">В плане тренировки стоят по понедельникам, средам и пятницам — отметьте свои. В дни зала калорий больше на ${GYM_SPREAD[who]}, в остальные меньше; недельное среднее от перестановки не меняется, а навески в меню пересчитываются сами.</p>
+    <div class="pillbar" style="padding:0 0 12px">${PLAN.days.map((x, i) => `<button type="button" data-gym="${i}" aria-pressed="${isGym(i)}">${x.name.slice(0, 3)}<i>${nf(targetFor(who, x.id))}</i></button>`).join('')}</div>
+    ${gymCount() === 0 || gymCount() === PLAN.days.length
+      ? `<p class="verdict v-warn" style="margin:0 0 12px">${gymCount() ? 'Зал каждый день — тогда и калории каждый день одинаковые.' : 'Тренировок нет ни в одном дне: все дни идут по среднему.'} Недельная норма от этого не меняется, меняется только раскладка по дням.</p>` : ''}
     <div class="prm">
       ${rows}
       <div class="wide"><label>Образ жизни</label><select id="pf_act">${actOpts}</select></div>
@@ -2905,7 +2938,7 @@ function pageHome(){
       <span class="d">${d.name.slice(0,2)}</span>
       <span class="bar"><span class="fill" style="height:${Math.round(DT[i]/mx*100)}%"></span></span>
       <span class="k">${nf(DT[i])}</span>
-      ${d.gym?'<span class="g" title="день зала"></span>':'<span class="g" style="background:transparent"></span>'}
+      ${isGym(i)?'<span class="g" title="день зала"></span>':'<span class="g" style="background:transparent"></span>'}
     </button>`).join('');
   return `
   <div class="card sec">
@@ -3084,7 +3117,7 @@ function pageWeek(){
       <h3>${esc(d.name)}${day===TODAY?' <em style="color:var(--kcal)">сегодня</em>':''}</h3>
       <p class="note">${esc(d.sub)} · ${d.meals.length} приёмов пищи${drinkTotals(who).cups ? " + напитки" : ""} · порция: ${person(who).name.toLowerCase()}</p>
       <div class="hero-tags">
-        <span class="tag ${d.gym?'tg-gym':'tg-ghost'}">${esc(d.badge)}</span>
+        <span class="tag ${isGym(day)?'tg-gym':'tg-ghost'}">${isGym(day) ? 'зал' : 'прогулка 2–3 км'}</span>
         <span class="tag tg-ghost">${meter(v.p,v.k)}</span>
       </div>
       <p class="lead" style="font-size:13px">Кольцо показывает, из чего набраны калории дня: оранжевый — белок, серый — жир, жёлтый — углеводы.</p>
@@ -3511,6 +3544,8 @@ document.addEventListener('click', e=>{
     render(); return;
   }
   if(e.target.id === 'doClear'){ built = []; builtTpl = null; consNote = ''; render(); return; }
+  const gd = e.target.closest('[data-gym]');
+  if(gd){ const i = +gd.dataset.gym; setGym(i, !isGym(i)); render(); return; }
   const et = e.target.closest('[data-eat]');
   if(et){ markDay(day, et.dataset.eat || null, 0); render(); return; }
   if(e.target.closest('#eat_save')){

@@ -1193,6 +1193,78 @@ const probe = `
   console.log('проблем с логикой шагов:', sl2);
   }
 
+  { // свои дни зала
+  let gy = 0;
+  profiles = {}; swaps = {}; who = 'm';
+  const N = PLAN.days.length;
+
+  // по умолчанию — как в плане
+  gymDays = PLAN.days.map(d => !!d.gym);
+  for (let i = 0; i < N; i++) if (isGym(i) !== !!PLAN.days[i].gym) { gy++; console.log('  умолчание разошлось с планом:', i); }
+  for (const k of ['m', 'w']) for (const d of PLAN.days) {
+    if (Math.abs(targetFor(k, d.id) - PLAN.targets[k][d.id]) > 5) {
+      gy++; console.log('  цель дня уехала при плановой расстановке:', k, d.name, targetFor(k, d.id), 'вместо', PLAN.targets[k][d.id]);
+    }
+  }
+
+  // любая расстановка сохраняет недельное среднее
+  const SETS = [
+    [false,true,false,true,false,true,false],
+    [true,true,false,true,true,false,false],
+    [true,false,false,false,false,false,false],
+    [false,false,false,false,false,false,false],
+    [true,true,true,true,true,true,true],
+    [false,false,true,false,false,true,true]
+  ];
+  for (const set of SETS) {
+    gymDays = set.slice();
+    for (const k of ['m', 'w']) {
+      const avg = PLAN.days.reduce((a, d) => a + targetFor(k, d.id), 0) / N;
+      if (Math.abs(avg - PLAN.people[k].kcal) > PLAN.people[k].kcal * 0.01) {
+        gy++; console.log('  недельное среднее поехало:', k, set.filter(Boolean).length, 'дней ->', Math.round(avg), 'вместо', PLAN.people[k].kcal);
+      }
+      const n = set.filter(Boolean).length;
+      if (n > 0 && n < N) {
+        const hi = targetFor(k, PLAN.days[set.indexOf(true)].id);
+        const lo = targetFor(k, PLAN.days[set.indexOf(false)].id);
+        if (hi <= lo) { gy++; console.log('  день зала не калорийнее обычного:', k, hi, lo); }
+        if (Math.abs((hi - lo) - GYM_SPREAD[k]) > 10) { gy++; console.log('  разница между днями не та:', k, hi - lo); }
+      } else {
+        const all = PLAN.days.map(d => targetFor(k, d.id));
+        if (Math.max.apply(null, all) - Math.min.apply(null, all) > 5) { gy++; console.log('  без выбора дни должны быть равны:', k); }
+      }
+    }
+  }
+
+  // навески в меню идут за целью дня
+  gymDays = [false,true,false,true,false,true,false];
+  for (const k of ['m', 'w']) for (let di = 0; di < N; di++) {
+    const got = dayTotals(di, k).k, want = targetFor(k, PLAN.days[di].id);
+    if (Math.abs(got - want) > want * 0.05) {
+      gy++; console.log('  день не подстроился под новую цель:', k, PLAN.days[di].name, Math.round(got), 'при цели', want);
+    }
+  }
+
+  // разметка: бейдж и переключатели
+  day = 1; who = 'm';
+  if (pageWeek().indexOf('зал') < 0) { gy++; console.log('  во вторник нет метки зала'); }
+  gymDays = [false,false,false,false,false,false,false];
+  if (pageWeek().indexOf('прогулка') < 0) { gy++; console.log('  без зала нет обычной метки'); }
+  const hp3 = pageProfile();
+  if (hp3.indexOf('data-gym') < 0) { gy++; console.log('  нет переключателей дней зала'); }
+  if (hp3.indexOf('Дни зала') < 0) { gy++; console.log('  нет заголовка «Дни зала»'); }
+  if (bad(hp3).length) { gy++; console.log('  ПРОБЛЕМА отрисовки параметров:', bad(hp3).join(',')); }
+
+  // переключение сохраняется
+  setGym(0, true);
+  if (!isGym(0)) { gy++; console.log('  день зала не включился'); }
+  setGym(0, false);
+  if (isGym(0)) { gy++; console.log('  день зала не выключился'); }
+
+  gymDays = PLAN.days.map(d => !!d.gym);
+  console.log('проблем с днями зала:', gy);
+  }
+
   console.log('сегодня по календарю: индекс ' + TODAY + ' -> ' + PLAN.days[TODAY].name);
 })();
 `;
