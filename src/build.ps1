@@ -4,85 +4,84 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 
 # ---- База: ккал / белок / жир / углеводы на 100 г ----
 $DB = @{}
-function Add-Food($n,$k,$p,$f,$c){ $script:DB[$n] = @($k,$p,$f,$c) }
+function Add-Food($n,$k,$p,$f,$c,$b){ $script:DB[$n] = @($k,$p,$f,$c,$b) }
 
-Add-Food 'творог 5%'          121 17.2 5.0 1.8
-Add-Food 'кефир 1%'            40  3.0 1.0 4.0
-Add-Food 'молоко 2,5%'         52  2.9 2.5 4.7
-Add-Food 'молоко 1,5%'         44  3.0 1.5 4.7
-Add-Food 'йогурт греческий'    60  8.0 2.0 3.5
-Add-Food 'сметана 15%'        158  2.6 15.0 3.0
-Add-Food 'сыр 45%'            360 23.0 30.0 0.0
-Add-Food 'творожный сыр'      230  6.0 22.0 3.0
-Add-Food 'яйцо'               157 12.7 11.0 0.7
-Add-Food 'филе куриное'       113 23.6 1.9 0.0
-Add-Food 'бедро куриное б/к'  165 20.0 9.0 0.0
-Add-Food 'фарш индейки'       145 20.0 7.0 0.0
-Add-Food 'говядина'           187 19.0 12.0 0.0
-Add-Food 'свинина, лопатка'   200 18.0 14.0 0.0
-Add-Food 'треска'              78 17.7 0.7 0.0
-Add-Food 'минтай'              72 15.9 0.9 0.0
-Add-Food 'тунец с/с'           96 21.0 1.0 0.0
-Add-Food 'хлопья овсяные'     370 12.0 6.5 61.0
-Add-Food 'гречка гот.'        110  4.2 1.1 21.0
-Add-Food 'рис гот.'           116  2.4 0.3 25.0
-Add-Food 'булгур гот.'        110  3.5 0.3 23.0
-Add-Food 'перловка гот.'      106  3.0 0.4 22.0
-Add-Food 'рис сухой'          340  7.0 1.0 74.0
-Add-Food 'картофель'           77  2.0 0.4 16.0
-Add-Food 'картофель отв.'      85  2.0 0.1 18.0
-Add-Food 'манка'              333 10.0 1.0 70.0
-Add-Food 'мука пшеничная'     340 10.0 1.0 71.0
-Add-Food 'мука ц/з'           320 12.0 2.0 60.0
-Add-Food 'банан'               95  1.5 0.2 21.0
-Add-Food 'яблоко'              47  0.4 0.4 10.0
-Add-Food 'мандарин'            38  0.8 0.2 7.5
-Add-Food 'ягоды заморож.'      45  0.8 0.3 8.0
-Add-Food 'изюм'               280  2.5 0.5 66.0
-Add-Food 'финик'              280  2.5 0.5 69.0
-Add-Food 'мёд'                320  0.8 0.0 80.0
-Add-Food 'капуста'             28  1.8 0.1 4.7
-Add-Food 'капуста квашеная'    19  1.8 0.1 2.2
-Add-Food 'морковь'             33  1.3 0.1 6.9
-Add-Food 'лук'                 42  1.4 0.0 8.2
-Add-Food 'помидор'             20  1.1 0.2 3.7
-Add-Food 'огурец'              14  0.8 0.1 2.5
-Add-Food 'кабачок'             24  1.2 0.3 4.6
-Add-Food 'брокколи'            34  3.0 0.4 5.0
-Add-Food 'перец сладкий'       27  1.3 0.1 5.3
-Add-Food 'фасоль конс.'        99  6.7 0.5 17.0
-Add-Food 'томатная паста'     100  4.3 0.5 19.0
-Add-Food 'масло раст.'        899  0.0 99.9 0.0
-Add-Food 'орех грецкий'       654 15.0 65.0 7.0
-Add-Food 'семечки тыквенные'  559 30.0 49.0 11.0
-Add-Food 'семечки подсолн.'   578 21.0 53.0 20.0
-Add-Food 'кунжут'             573 18.0 49.0 12.0
-Add-Food 'чиа'                486 17.0 31.0 7.0
-Add-Food 'паста арахисовая'   600 25.0 50.0 20.0
-Add-Food 'протеин'            385 80.0 5.0 6.0
-Add-Food 'какао'              290 24.0 15.0 10.0
-Add-Food 'шоколад 85%'        570 10.0 46.0 19.0
-Add-Food 'шоколад 72%'        546  7.9 38.0 44.0
-Add-Food 'клубника'            33  0.8 0.4  7.0
-Add-Food 'вишня'               52  0.8 0.2 11.0
-Add-Food 'зефир'              300  0.8 0.0 78.0
-Add-Food 'пастила'            320  0.5 0.0 80.0
-Add-Food 'мармелад'           300  0.0 0.0 76.0
-Add-Food 'хлебец'             300 10.0 2.0 60.0
-Add-Food 'хумус'              230  7.0 17.0 12.0
-Add-Food 'дрожжи'             325 40.0 6.0 30.0
-Add-Food 'сахар'              399  0.0 0.0 100.0
-Add-Food 'шампиньоны'          27  4.3 1.0 0.1
-Add-Food 'фарш куриный'       120 19.0 5.0 0.0
-Add-Food 'сыр лёгкий'         255 30.0 17.0 0.0
-Add-Food 'листы лазаньи'      350 12.0 1.5 71.0
-Add-Food 'фарш говяжий'       200 18.0 14.0 0.0
-Add-Food 'горошек конс.'       55  3.6 0.3 9.0
-Add-Food 'кукуруза конс.'      78  2.5 0.8 15.0
-Add-Food 'сок'                 45  0.5 0.1 11.0
-Add-Food 'сливки 10%'         118  3.0 10.0 4.0
-Add-Food 'нут отв.'           164  8.9 2.6 27.4
-
+Add-Food 'творог 5%'          121 17.2 5.0 1.8     0
+Add-Food 'кефир 1%'            40  3.0 1.0 4.0     0
+Add-Food 'молоко 2,5%'         52  2.9 2.5 4.7     0
+Add-Food 'молоко 1,5%'         44  3.0 1.5 4.7     0
+Add-Food 'йогурт греческий'    60  8.0 2.0 3.5     0
+Add-Food 'сметана 15%'        158  2.6 15.0 3.0     0
+Add-Food 'сыр 45%'            360 23.0 30.0 0.0     0
+Add-Food 'творожный сыр'      230  6.0 22.0 3.0     0
+Add-Food 'яйцо'               157 12.7 11.0 0.7     0
+Add-Food 'филе куриное'       113 23.6 1.9 0.0     0
+Add-Food 'бедро куриное б/к'  165 20.0 9.0 0.0     0
+Add-Food 'фарш индейки'       145 20.0 7.0 0.0     0
+Add-Food 'говядина'           187 19.0 12.0 0.0     0
+Add-Food 'свинина, лопатка'   200 18.0 14.0 0.0     0
+Add-Food 'треска'              78 17.7 0.7 0.0     0
+Add-Food 'минтай'              72 15.9 0.9 0.0     0
+Add-Food 'тунец с/с'           96 21.0 1.0 0.0     0
+Add-Food 'хлопья овсяные'     370 12.0 6.5 61.0    10
+Add-Food 'гречка гот.'        110  4.2 1.1 21.0   2.7
+Add-Food 'рис гот.'           116  2.4 0.3 25.0   0.4
+Add-Food 'булгур гот.'        110  3.5 0.3 23.0   4.5
+Add-Food 'перловка гот.'      106  3.0 0.4 22.0   3.8
+Add-Food 'рис сухой'          340  7.0 1.0 74.0   1.3
+Add-Food 'картофель'           77  2.0 0.4 16.0   1.5
+Add-Food 'картофель отв.'      85  2.0 0.1 18.0   1.8
+Add-Food 'манка'              333 10.0 1.0 70.0   3.6
+Add-Food 'мука пшеничная'     340 10.0 1.0 71.0   2.7
+Add-Food 'мука ц/з'           320 12.0 2.0 60.0  10.7
+Add-Food 'банан'               95  1.5 0.2 21.0   2.6
+Add-Food 'яблоко'              47  0.4 0.4 10.0   2.4
+Add-Food 'мандарин'            38  0.8 0.2 7.5   1.8
+Add-Food 'ягоды заморож.'      45  0.8 0.3 8.0     4
+Add-Food 'изюм'               280  2.5 0.5 66.0   3.7
+Add-Food 'финик'              280  2.5 0.5 69.0   6.7
+Add-Food 'мёд'                320  0.8 0.0 80.0   0.2
+Add-Food 'капуста'             28  1.8 0.1 4.7     2
+Add-Food 'капуста квашеная'    19  1.8 0.1 2.2     3
+Add-Food 'морковь'             33  1.3 0.1 6.9   2.8
+Add-Food 'лук'                 42  1.4 0.0 8.2   1.7
+Add-Food 'помидор'             20  1.1 0.2 3.7   1.2
+Add-Food 'огурец'              14  0.8 0.1 2.5   0.5
+Add-Food 'кабачок'             24  1.2 0.3 4.6     1
+Add-Food 'брокколи'            34  3.0 0.4 5.0   2.6
+Add-Food 'перец сладкий'       27  1.3 0.1 5.3   1.7
+Add-Food 'фасоль конс.'        99  6.7 0.5 17.0     6
+Add-Food 'томатная паста'     100  4.3 0.5 19.0   4.1
+Add-Food 'масло раст.'        899  0.0 99.9 0.0     0
+Add-Food 'орех грецкий'       654 15.0 65.0 7.0   6.7
+Add-Food 'семечки тыквенные'  559 30.0 49.0 11.0     6
+Add-Food 'семечки подсолн.'   578 21.0 53.0 20.0   8.6
+Add-Food 'кунжут'             573 18.0 49.0 12.0  11.8
+Add-Food 'чиа'                486 17.0 31.0 7.0  34.4
+Add-Food 'паста арахисовая'   600 25.0 50.0 20.0     6
+Add-Food 'протеин'            385 80.0 5.0 6.0     1
+Add-Food 'какао'              290 24.0 15.0 10.0    30
+Add-Food 'шоколад 85%'        570 10.0 46.0 19.0    11
+Add-Food 'шоколад 72%'        546  7.9 38.0 44.0     7
+Add-Food 'клубника'            33  0.8 0.4  7.0     2
+Add-Food 'вишня'               52  0.8 0.2 11.0   1.6
+Add-Food 'зефир'              300  0.8 0.0 78.0     0
+Add-Food 'пастила'            320  0.5 0.0 80.0     1
+Add-Food 'мармелад'           300  0.0 0.0 76.0     0
+Add-Food 'хлебец'             300 10.0 2.0 60.0     6
+Add-Food 'хумус'              230  7.0 17.0 12.0     6
+Add-Food 'дрожжи'             325 40.0 6.0 30.0    26
+Add-Food 'сахар'              399  0.0 0.0 100.0     0
+Add-Food 'шампиньоны'          27  4.3 1.0 0.1     1
+Add-Food 'фарш куриный'       120 19.0 5.0 0.0     0
+Add-Food 'сыр лёгкий'         255 30.0 17.0 0.0     0
+Add-Food 'листы лазаньи'      350 12.0 1.5 71.0     3
+Add-Food 'фарш говяжий'       200 18.0 14.0 0.0     0
+Add-Food 'горошек конс.'       55  3.6 0.3 9.0   4.5
+Add-Food 'кукуруза конс.'      78  2.5 0.8 15.0   2.5
+Add-Food 'сок'                 45  0.5 0.1 11.0   0.2
+Add-Food 'сливки 10%'         118  3.0 10.0 4.0     0
+Add-Food 'нут отв.'           164  8.9 2.6 27.4   7.6
 # Штучные продукты: сколько граммов в 1 шт
 $U = @{ 'яйцо'=55; 'зефир'=30; 'хлебец'=10; 'мандарин'=80; 'финик'=8 }
 
@@ -97,13 +96,13 @@ function Parse($s){
   ,$r
 }
 function Calc($items){
-  $kk=0.0;$pp=0.0;$ff=0.0;$cc=0.0
+  $kk=0.0;$pp=0.0;$ff=0.0;$cc=0.0;$bb=0.0
   foreach($i in $items){
     $n=$i[0]; $g=$i[1]
     if(-not $DB.ContainsKey($n)){ throw "нет в базе: $n" }
-    $v=$DB[$n]; $kk+=$v[0]*$g/100; $pp+=$v[1]*$g/100; $ff+=$v[2]*$g/100; $cc+=$v[3]*$g/100
+    $v=$DB[$n]; $kk+=$v[0]*$g/100; $pp+=$v[1]*$g/100; $ff+=$v[2]*$g/100; $cc+=$v[3]*$g/100; $bb+=$v[4]*$g/100
   }
-  @($kk,$pp,$ff,$cc)
+  @($kk,$pp,$ff,$cc,$bb)
 }
 function Qty($items){
   $out=@()
@@ -121,7 +120,7 @@ $RECIPES = @()
 function Add-Recipe($key,$title,$gear,$ing,$yieldG,$portionW,$portionM,$steps,$hint){
   $items = Parse $ing
   $t = Calc $items
-  $per100 = @( ($t[0]/$yieldG*100), ($t[1]/$yieldG*100), ($t[2]/$yieldG*100), ($t[3]/$yieldG*100) )
+  $per100 = @( ($t[0]/$yieldG*100), ($t[1]/$yieldG*100), ($t[2]/$yieldG*100), ($t[3]/$yieldG*100), ($t[4]/$yieldG*100) )
   $script:DB[$key] = $per100
   $script:RECIPES += [pscustomobject]@{
     key=$key; title=$title; gear=$gear; items=$items; yield=$yieldG
@@ -381,9 +380,9 @@ function Balance($wAll,$mAll,$targetM){
 }
 
 $DATA=@()
-$wkT=@(0.0,0.0,0.0,0.0); $mkT=@(0.0,0.0,0.0,0.0)
+$wkT=@(0.0,0.0,0.0,0.0,0.0); $mkT=@(0.0,0.0,0.0,0.0,0.0)
 foreach($d in $DAYS){
-  $dw=@(0.0,0.0,0.0,0.0); $dm=@(0.0,0.0,0.0,0.0)
+  $dw=@(0.0,0.0,0.0,0.0,0.0); $dm=@(0.0,0.0,0.0,0.0,0.0)
   $mealsOut=@()
   $rows = [System.Text.StringBuilder]::new()
   $wAll=@(); $mAll=@()
@@ -395,11 +394,11 @@ foreach($d in $DAYS){
   foreach($ml in $d.meals){
     $wi = $wAll[$idx]; $mi = $mAll[$idx]; $idx++
     $wv = Calc $wi;   $mv = Calc $mi
-    for($i=0;$i -lt 4;$i++){ $dw[$i]+=$wv[$i]; $dm[$i]+=$mv[$i] }
+    for($i=0;$i -lt 5;$i++){ $dw[$i]+=$wv[$i]; $dm[$i]+=$mv[$i] }
     $mealsOut += [pscustomobject]@{
       label=$ml.label; title=$ml.title; note=$ml.note
-      w=[pscustomobject]@{ qty=(Qty $wi); k=[math]::Round($wv[0]); p=[math]::Round($wv[1]); f=[math]::Round($wv[2]); c=[math]::Round($wv[3]) }
-      m=[pscustomobject]@{ qty=(Qty $mi); k=[math]::Round($mv[0]); p=[math]::Round($mv[1]); f=[math]::Round($mv[2]); c=[math]::Round($mv[3]) }
+      w=[pscustomobject]@{ qty=(Qty $wi); k=[math]::Round($wv[0]); p=[math]::Round($wv[1]); f=[math]::Round($wv[2]); c=[math]::Round($wv[3]); b=[math]::Round($wv[4],1) }
+      m=[pscustomobject]@{ qty=(Qty $mi); k=[math]::Round($mv[0]); p=[math]::Round($mv[1]); f=[math]::Round($mv[2]); c=[math]::Round($mv[3]); b=[math]::Round($mv[4],1) }
     }
     $sweet = if($ml.label -eq 'Вечер'){'<span class="tag-sweet">сладкое</span>'}else{''}
     $null = $rows.AppendLine('    <div class="meal">')
@@ -414,11 +413,11 @@ foreach($d in $DAYS){
     $null = $rows.AppendLine('      </div>')
     $null = $rows.AppendLine('    </div>')
   }
-  for($i=0;$i -lt 4;$i++){ $wkT[$i]+=$dw[$i]; $mkT[$i]+=$dm[$i] }
+  for($i=0;$i -lt 5;$i++){ $wkT[$i]+=$dw[$i]; $mkT[$i]+=$dm[$i] }
   $DATA += [pscustomobject]@{
     id=$d.id; name=$d.name; sub=$d.sub; badge=$d.badge; gym=($d.cls -eq 'badge-gym')
-    w=[pscustomobject]@{ k=[math]::Round($dw[0]); p=[math]::Round($dw[1]); f=[math]::Round($dw[2]); c=[math]::Round($dw[3]) }
-    m=[pscustomobject]@{ k=[math]::Round($dm[0]); p=[math]::Round($dm[1]); f=[math]::Round($dm[2]); c=[math]::Round($dm[3]) }
+    w=[pscustomobject]@{ k=[math]::Round($dw[0]); p=[math]::Round($dw[1]); f=[math]::Round($dw[2]); c=[math]::Round($dw[3]); b=[math]::Round($dw[4]) }
+    m=[pscustomobject]@{ k=[math]::Round($dm[0]); p=[math]::Round($dm[1]); f=[math]::Round($dm[2]); c=[math]::Round($dm[3]); b=[math]::Round($dm[4]) }
     meals=$mealsOut
   }
   $null = $sb.AppendLine("  <article class=`"day`" id=`"$($d.id)`">")
@@ -438,8 +437,8 @@ $null = $sb.AppendLine('</section>')
 
 ""
 "НЕДЕЛЬНОЕ СРЕДНЕЕ"
-"  Она: {0:N0} ккал (цель 1704) · Б {1:N0} г = {2:N2} г/кг · Ж {3:N0} · У {4:N0}" -f ($wkT[0]/7),($wkT[1]/7),($wkT[1]/7/65),($wkT[2]/7),($wkT[3]/7)
-"  Он:  {0:N0} ккал (цель 1953) · Б {1:N0} г = {2:N2} г/кг · Ж {3:N0} · У {4:N0}" -f ($mkT[0]/7),($mkT[1]/7),($mkT[1]/7/90),($mkT[2]/7),($mkT[3]/7)
+"  Она: {0:N0} ккал (цель 1704) · Б {1:N0} г = {2:N2} г/кг · Ж {3:N0} · У {4:N0} · клетчатка {5:N0} г" -f ($wkT[0]/7),($wkT[1]/7),($wkT[1]/7/65),($wkT[2]/7),($wkT[3]/7),($wkT[4]/7)
+"  Он:  {0:N0} ккал (цель 1953) · Б {1:N0} г = {2:N2} г/кг · Ж {3:N0} · У {4:N0} · клетчатка {5:N0} г" -f ($mkT[0]/7),($mkT[1]/7),($mkT[1]/7/90),($mkT[2]/7),($mkT[3]/7),($mkT[4]/7)
 ""
 "РЕЦЕПТЫ — КБЖУ"
 foreach($r in $RECIPES){
@@ -542,7 +541,7 @@ $SWEETS = @(
 function SmallItem($row){
   $it = Parse $row[1]; $v = Calc $it
   [pscustomobject]@{ title=$row[0]; qty=(Qty $it); note=$row[2]
-    k=[math]::Round($v[0]); p=[math]::Round($v[1]); f=[math]::Round($v[2]); c=[math]::Round($v[3]) }
+    k=[math]::Round($v[0]); p=[math]::Round($v[1]); f=[math]::Round($v[2]); c=[math]::Round($v[3]); b=[math]::Round($v[4],1) }
 }
 
 $recOut = @()
@@ -555,7 +554,7 @@ foreach($r in $RECIPES){
   }
   $recOut += [pscustomobject]@{
     key=$r.key; title=$r.title; gear=$r.gear; steps=$r.steps; hint=$r.hint; ing=$ingOut
-    per100=[pscustomobject]@{ k=[math]::Round($r.per100[0]); p=[math]::Round($r.per100[1],1); f=[math]::Round($r.per100[2],1); c=[math]::Round($r.per100[3],1) }
+    per100=[pscustomobject]@{ k=[math]::Round($r.per100[0]); p=[math]::Round($r.per100[1],1); f=[math]::Round($r.per100[2],1); c=[math]::Round($r.per100[3],1); b=[math]::Round($r.per100[4],1) }
     pw=$r.pw; pm=$r.pm; outG=$r.yield
     vw=[pscustomobject]@{ k=[math]::Round($r.per100[0]*$r.pw/100); p=[math]::Round($r.per100[1]*$r.pw/100); f=[math]::Round($r.per100[2]*$r.pw/100); c=[math]::Round($r.per100[3]*$r.pw/100) }
     vm=[pscustomobject]@{ k=[math]::Round($r.per100[0]*$r.pm/100); p=[math]::Round($r.per100[1]*$r.pm/100); f=[math]::Round($r.per100[2]*$r.pm/100); c=[math]::Round($r.per100[3]*$r.pm/100) }
@@ -583,7 +582,7 @@ foreach($pair in $CAT){
     $v = $DB[$n]
     $foodsOut += [pscustomobject]@{
       n=$n; cat=$pair[0]
-      k=[math]::Round($v[0],1); p=[math]::Round($v[1],1); f=[math]::Round($v[2],1); c=[math]::Round($v[3],1)
+      k=[math]::Round($v[0],1); p=[math]::Round($v[1],1); f=[math]::Round($v[2],1); c=[math]::Round($v[3],1); b=[math]::Round($v[4],1)
       unit=$(if($U.ContainsKey($n)){ $U[$n] }else{ 0 })
       on=$(if($STAPLE -contains $n){ $true }else{ $false })
     }
@@ -600,7 +599,7 @@ $recKeys = @($RECIPES  | ForEach-Object { $_.key })
 foreach($n in ($DB.Keys | Sort-Object)){
   if($known -contains $n -or $recKeys -contains $n){ continue }
   $v = $DB[$n]
-  $baseOut[$n] = [pscustomobject]@{ k=[math]::Round($v[0],1); p=[math]::Round($v[1],1); f=[math]::Round($v[2],1); c=[math]::Round($v[3],1) }
+  $baseOut[$n] = [pscustomobject]@{ k=[math]::Round($v[0],1); p=[math]::Round($v[1],1); f=[math]::Round($v[2],1); c=[math]::Round($v[3],1); b=[math]::Round($v[4],1) }
 }
 "продуктов вне конструктора: $($baseOut.Count)"
 
@@ -609,10 +608,10 @@ $plan = [pscustomobject]@{
   base = $baseOut
   people = [pscustomobject]@{
     w = [pscustomobject]@{ key='w'; name='Она'; meta='базовая порция'; note='вес в норме, цель — форма'; tdee=1940; deficit=12
-                           kcal=[math]::Round($wkT[0]/7); prot=[math]::Round($wkT[1]/7); fat=[math]::Round($wkT[2]/7); carb=[math]::Round($wkT[3]/7)
+                           kcal=[math]::Round($wkT[0]/7); prot=[math]::Round($wkT[1]/7); fat=[math]::Round($wkT[2]/7); carb=[math]::Round($wkT[3]/7); fib=[math]::Round($wkT[4]/7)
                            gkg=[math]::Round($wkT[1]/7/65,2); rate='0,2 кг/нед' }
     m = [pscustomobject]@{ key='m'; name='Он';  meta='порция с добавкой'; note='есть запас жировой массы'; tdee=2540; deficit=23
-                           kcal=[math]::Round($mkT[0]/7); prot=[math]::Round($mkT[1]/7); fat=[math]::Round($mkT[2]/7); carb=[math]::Round($mkT[3]/7)
+                           kcal=[math]::Round($mkT[0]/7); prot=[math]::Round($mkT[1]/7); fat=[math]::Round($mkT[2]/7); carb=[math]::Round($mkT[3]/7); fib=[math]::Round($mkT[4]/7)
                            gkg=[math]::Round($mkT[1]/7/90,2); rate='0,5–0,6 кг/нед' }
   }
   targets = [pscustomobject]@{ w=$TW; m=$TM }

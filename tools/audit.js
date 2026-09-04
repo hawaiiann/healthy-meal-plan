@@ -21,8 +21,8 @@ const num = n => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
    которую мы не считаем углеводом. */
 head('КАЛОРИЙНОСТЬ ПРОДУКТОВ ПРОТИВ ИХ МАКРОСОВ');
 const FIBER_OK = new Set(['чиа']);   /* клетчатка: ккал по этикетке выше расчётной */
-const foods = PLAN.foods.map(f => ({ n: f.n, k: f.k, p: f.p, f: f.f, c: f.c }))
-  .concat(Object.entries(PLAN.base || {}).map(([n, v]) => ({ n, k: v.k, p: v.p, f: v.f, c: v.c })));
+const foods = PLAN.foods.map(f => ({ n: f.n, k: f.k, p: f.p, f: f.f, c: f.c, b: f.b }))
+  .concat(Object.entries(PLAN.base || {}).map(([n, v]) => ({ n, k: v.k, p: v.p, f: v.f, c: v.c, b: v.b })));
 let off = 0;
 for (const x of foods) {
   const at = 4 * x.p + 9 * x.f + 4 * x.c;
@@ -85,6 +85,24 @@ for (const who of ['w', 'm']) {
   console.log('  ' + n.name + ': ' + num(t.k / 7) + ' ккал/день (норма ' + num(n.kcal) + '), Б ' +
     Math.round(t.p / 7) + ' Ж ' + Math.round(t.f / 7) + ' У ' + Math.round(t.c / 7) +
     '  — доли ' + Math.round(t.p * 4 / t.k * 100) + '/' + Math.round(t.f * 9 / t.k * 100) + '/' + Math.round(t.c * 4 / t.k * 100) + '%');
+}
+
+/* ---------- 3б. клетчатка ---------- */
+head('КЛЕТЧАТКА');
+for (const x of foods) {
+  if (typeof x.b !== 'number' || x.b < 0) fail(x.n + ': клетчатка не число или отрицательная');
+  else if (x.b > 80) fail(x.n + ': ' + x.b + ' г клетчатки на 100 г — столько не бывает');
+}
+for (const who of ['w', 'm']) {
+  for (const d of PLAN.days) {
+    const b = d.meals.reduce((a, m) => a + (m[who].b || 0), 0);
+    /* 25–30 г — рабочий коридор; ниже 20 отзывается кишечником,
+       выше 45 на такой калорийности мешает есть */
+    if (b < 20) fail(d.name + ' (' + who + '): клетчатки всего ' + Math.round(b) + ' г');
+    if (b > 45) fail(d.name + ' (' + who + '): клетчатки ' + Math.round(b) + ' г — многовато за раз');
+  }
+  const wb = PLAN.days.reduce((a, d) => a + d.meals.reduce((x, m) => x + (m[who].b || 0), 0), 0) / 7;
+  console.log('  ' + PLAN.people[who].name + ': ' + Math.round(wb) + ' г в среднем за день (норма 25–30)');
 }
 
 /* ---------- 4. приёмы: порядок порций и вменяемые навески ---------- */

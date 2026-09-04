@@ -757,6 +757,234 @@ const probe = `
   console.log('проблем с границами и живучестью:', sf);
   }
 
+  { // клетчатка
+  let fb = 0;
+  profiles = {}; swaps = {}; custom = []; rebuildFood(); who = 'm';
+  for (const f of PLAN.foods) if (typeof f.b !== 'number' || f.b < 0) { fb++; console.log('  у продукта нет клетчатки:', f.n); }
+  for (let d = 0; d < PLAN.days.length; d++) {
+    const t = dayTotals(d);
+    if (!(t.b > 0)) { fb++; console.log('  в дне не посчиталась клетчатка:', PLAN.days[d].name); }
+    /* сумма приёмов должна давать итог дня и по клетчатке тоже */
+    let s2 = 0;
+    for (let mi = 0; mi < PLAN.days[d].meals.length; mi++) s2 += mealView(d, mi).v.b || 0;
+    if (Math.abs(s2 - t.b) > 0.5) { fb++; console.log('  клетчатка приёмов не сходится с днём:', PLAN.days[d].name, s2, t.b); }
+    if (t.b < 15 || t.b > 50) { fb++; console.log('  клетчатка вне коридора:', PLAN.days[d].name, Math.round(t.b)); }
+  }
+  if (tiles(dayTotals(0)).indexOf('Клетчатка') < 0) { fb++; console.log('  нет плитки клетчатки'); }
+  day = 0;
+  if (pageWeek().indexOf('Клетчатки за день') < 0) { fb++; console.log('  нет подсказки по клетчатке в дне'); }
+  /* число в подсказке должно быть настоящим, а не нулём из потерянного поля */
+  if (/Клетчатки за день (всего )?0 г/.test(pageWeek())) { fb++; console.log('  в дне показан ноль клетчатки'); }
+  if (pageWeek().indexOf('t-fib') < 0) { fb++; console.log('  нет плитки клетчатки в дне'); }
+  /* свой продукт с клетчаткой попадает в расчёт */
+  custom = [{ n:'отруби тест', cat:'Гарниры', k:250, p:15, f:4, c:20, b:40, unit:0, on:true, mine:true }];
+  rebuildFood();
+  const v = sumOf([{ n:'отруби тест', g:50 }]);
+  if (Math.abs(v.b - 20) > 0.01) { fb++; console.log('  клетчатка своего продукта не считается:', v.b); }
+  const v0 = sumOf([{ n:'филе куриное', g:100 }]);
+  if (v0.b !== 0) { fb++; console.log('  у курицы взялась клетчатка:', v0.b); }
+  custom = []; rebuildFood();
+  /* заготовки тоже несут клетчатку */
+  if (!PLAN.recipes.every(r => typeof r.per100.b === 'number')) { fb++; console.log('  у заготовки нет клетчатки на 100 г'); }
+  if (!PLAN.snacks.every(x => typeof x.b === 'number')) { fb++; console.log('  у перекуса нет клетчатки'); }
+  console.log('проблем с клетчаткой:', fb);
+  }
+
+  { // подгонка по белку и добор
+  let pg = 0;
+  profiles = {}; swaps = {}; custom = []; rebuildFood(); who = 'm';
+  for (const f of allFoods()) pantry[f.n] = true;
+
+  // 1. подгонка по двум целям не портит калории
+  let n = 0, sk = 0, worstK = 0;
+  for (const meal of ['Завтрак', 'Обед', 'Ужин', 'Перекус']) {
+    const aim = aimFor(meal);
+    for (let i = 0; i < 250; i++) {
+      const r = assembleDish(meal);
+      if (!r) continue;
+      const v = sumOf(r.items), dk = Math.abs(v.k - aim.k) / aim.k;
+      n++; sk += dk; if (dk > worstK) worstK = dk;
+      if (v.p > aim.p * 1.6) { pg++; console.log('  перебор белка:', r.tpl.id, Math.round(v.p), 'при цели', aim.p); }
+    }
+  }
+  if (sk / n > 0.02) { pg++; console.log('  средний промах по калориям вырос:', (sk / n * 100).toFixed(1) + '%'); }
+  if (worstK > 0.12) { pg++; console.log('  максимальный промах по калориям:', (worstK * 100).toFixed(1) + '%'); }
+
+  // 2. подгонка умеет тянуть белок вверх внутри коридора калорий
+  {
+    const list = [
+      { n:'филе куриное', g:60,  lo:40, hi:260, flex:true },
+      { n:'рис гот.',     g:300, lo:50, hi:400, flex:true }
+    ];
+    const k0 = sumOf(list).k;
+    fitAim(list, k0, 45);
+    const v = sumOf(list);
+    if (v.p <= 25) { pg++; console.log('  белок не подтянулся:', Math.round(v.p)); }
+    if (Math.abs(v.k - k0) > k0 * 0.05) { pg++; console.log('  калории уехали при доборе белка:', Math.round(v.k), 'из', Math.round(k0)); }
+  }
+
+  // 3. блюдо, которое белок не вытягивает, честно об этом говорит
+  aimMeal = 'Ужин';
+  {
+    /* нарочно бедное по белку блюдо: подгонке тут двигать нечего */
+    const aimU = aimFor('Ужин');
+    const rice = FOOD['рис гот.'];
+    built = [{ n:'рис гот.', g: roundG(rice, aimU.k / (rice.k / 100)), r:'grain', lo:50, hi:600, flex:true }];
+    builtTpl = null;
+    const g = proteinGap();
+    if (!g) { pg++; console.log('  недобор белка в шакшуке не замечен'); }
+    else {
+      if (!g.fix) { pg++; console.log('  нечем добрать при полной кладовке'); }
+      if (pageCons().indexOf('Добрать белок') < 0) { pg++; console.log('  нет кнопки добора'); }
+      const before = sumOf(built), aim = aimFor('Ужин');
+      addProtein();
+      const after = sumOf(built);
+      if (after.p <= before.p + 2) { pg++; console.log('  добор не прибавил белка:', Math.round(before.p), '->', Math.round(after.p)); }
+      if (Math.abs(after.k - aim.k) > aim.k * 0.08) { pg++; console.log('  добор сломал калории:', Math.round(after.k), 'из', aim.k); }
+      if (proteinGap()) { pg++; console.log('  после добора недобор остался'); }
+      if (bad(pageCons()).length) { pg++; console.log('  ПРОБЛЕМА отрисовки после добора'); }
+    }
+  }
+
+  // 4. на достаточном белке подсказки быть не должно
+  built = [{ n:'филе куриное', g:250, lo:50, hi:400, flex:true }, { n:'рис гот.', g:150, lo:50, hi:400, flex:true }];
+  builtTpl = null;
+  if (proteinGap()) { pg++; console.log('  подсказка о белке висит на белковом блюде'); }
+  built = []; builtTpl = null;
+  if (proteinGap()) { pg++; console.log('  подсказка о белке висит на пустом конструкторе'); }
+  console.log('проблем с подгонкой по белку:', pg);
+  }
+
+  { // пересборка недели без кончившегося продукта
+  let oo = 0;
+  profiles = {}; custom = []; rebuildFood(); who = 'm';
+
+  // продукт внутри заготовки тоже считается
+  if (!usesFood('плов', 'филе куриное')) { oo++; console.log('  курица внутри плова не найдена'); }
+  if (usesFood('плов', 'минтай')) { oo++; console.log('  в плове нашлась несуществующая рыба'); }
+  if (!usesFood('творог 5%', 'творог 5%')) { oo++; console.log('  продукт сам себя не узнал'); }
+
+  for (const n of ['филе куриное', 'творог 5%', 'шампиньоны']) {
+    swaps = {};
+    for (const f of allFoods()) pantry[f.n] = true;
+    const hits = mealsUsing(n, 'm');
+    if (!hits.length) { oo++; console.log('  продукт вообще не найден в меню:', n); continue; }
+
+    const tgt = PLAN.days.map((_, d) => dayTotals(d, 'm').k);
+    pantry[n] = false;
+    const r = rebuildWithout(n, 'm');
+    if (r.total !== hits.length) { oo++; console.log('  пересборка увидела не столько приёмов:', n); }
+    if (!r.done) { oo++; console.log('  ни один приём не пересобрался:', n); }
+
+    // продукта в пересобранных приёмах быть не должно, кроме сладкого слота
+    for (const h of mealsUsing(n, 'm')) {
+      if (h.label !== 'Вечер') { oo++; console.log('  продукт остался в приёме:', n, PLAN.days[h.di].name, h.label); }
+    }
+    // приёмы держат калории и не проваливают белок
+    for (const h of hits) {
+      const V = mealView(h.di, h.mi, 'm');
+      if (!V.swapped) continue;
+      if (Math.abs(V.v.k - h.k) > h.k * 0.15) { oo++; console.log('  замена мимо калорий:', n, h.k, '->', V.v.k); }
+      if (h.p > 0 && V.v.p < h.p * 0.7) { oo++; console.log('  замена провалила белок:', n, h.p, '->', V.v.p); }
+    }
+    // день по-прежнему сходится
+    PLAN.days.forEach((d, di) => {
+      const now = dayTotals(di, 'm').k;
+      if (Math.abs(now - tgt[di]) > tgt[di] * 0.08) {
+        oo++; console.log('  день уехал после пересборки:', n, d.name, Math.round(tgt[di]), '->', Math.round(now));
+      }
+    });
+  }
+
+  // подсказка появляется при снятой галочке и убирается кнопкой
+  swaps = {};
+  for (const f of allFoods()) pantry[f.n] = true;
+  outNote = null;
+  pantry['филе куриное'] = false;
+  const hh = mealsUsing('филе куриное', 'm').filter(h => h.label !== 'Вечер');
+  outNote = hh.length ? { n:'филе куриное', count: hh.length } : null;
+  if (!outNote) { oo++; console.log('  подсказка о кончившемся продукте не появилась'); }
+  else {
+    const h = pageCons();
+    if (h.indexOf('Кончился продукт') < 0) { oo++; console.log('  карточки о кончившемся продукте нет'); }
+    if (h.indexOf('data-rebuild') < 0) { oo++; console.log('  нет кнопки пересборки'); }
+    if (bad(h).length) { oo++; console.log('  ПРОБЛЕМА отрисовки карточки:', bad(h).join(',')); }
+  }
+  outNote = null;
+  if (pageCons().indexOf('Кончился продукт') >= 0) { oo++; console.log('  карточка не убирается'); }
+
+  // сладкое пересборка не трогает
+  swaps = {};
+  for (const f of allFoods()) pantry[f.n] = true;
+  const sweetIdx = PLAN.days[0].meals.length - 1;
+  const sweetBefore = mealView(0, sweetIdx, 'm').title;
+  pantry['творог 5%'] = false;
+  rebuildWithout('творог 5%', 'm');
+  if (mealView(0, sweetIdx, 'm').title !== sweetBefore) { oo++; console.log('  пересборка тронула сладкий слот'); }
+
+  swaps = {}; for (const f of allFoods()) pantry[f.n] = true;
+  console.log('проблем с пересборкой без продукта:', oo);
+  }
+
+  { // дневник питания
+  let ee = 0;
+  profiles = {}; swaps = {}; eaten = {}; who = 'm'; day = TODAY;
+
+  if (eatStats('m', 14).marked !== 0) { ee++; console.log('  пустой дневник что-то насчитал'); }
+  if (pageProfile().indexOf('пока пусто') < 0) { ee++; console.log('  пустая сводка не показана'); }
+
+  // отметка ставится, читается и снимается
+  markDay(TODAY, 'plan', 0);
+  if (!eatOf(TODAY) || eatOf(TODAY).s !== 'plan') { ee++; console.log('  отметка не записалась'); }
+  if (eatStats('m', 14).plan !== 1) { ee++; console.log('  день по плану не сосчитался'); }
+  markDay(TODAY, 'off', 2400);
+  const st1 = eatStats('m', 14);
+  if (st1.plan !== 0 || st1.off !== 1) { ee++; console.log('  отметка не переписалась'); }
+  const tgtToday = targetFor('m', PLAN.days[TODAY].id);
+  if (st1.dev === null || Math.abs(st1.dev - (2400 - tgtToday)) > 1) {
+    ee++; console.log('  разница с планом посчитана неверно:', st1.dev, 'ожидалось', 2400 - tgtToday);
+  }
+  markDay(TODAY, null, 0);
+  if (eatOf(TODAY)) { ee++; console.log('  отметка не снялась'); }
+
+  // дневник у каждого свой
+  who = 'm'; markDay(TODAY, 'plan', 0);
+  who = 'w';
+  if (eatOf(TODAY)) { ee++; console.log('  чужая отметка видна второму'); }
+  if (eatStats('w', 14).marked !== 0) { ee++; console.log('  чужие дни попали в её сводку'); }
+  who = 'm';
+
+  // старые записи учитываются, будущие — нет
+  const iso = shift => { const d = new Date(); d.setDate(d.getDate() + shift); return d.toISOString().slice(0, 10); };
+  eaten['m|' + iso(-3)] = { s:'plan', k:0, t:iso(-3) };
+  eaten['m|' + iso(-20)] = { s:'plan', k:0, t:iso(-20) };
+  eaten['m|' + iso(3)] = { s:'plan', k:0, t:iso(3) };
+  const st2 = eatStats('m', 14);
+  if (st2.marked !== 2) { ee++; console.log('  в окно 14 дней попало не то число записей:', st2.marked); }
+
+  // разметка
+  day = TODAY;
+  const hw = pageWeek();
+  if (hw.indexOf('Ел как в плане') < 0 || hw.indexOf('Ели другое') < 0) { ee++; console.log('  нет кнопок отметки'); }
+  if (hw.indexOf('Снять отметку') < 0) { ee++; console.log('  нет кнопки снятия при отмеченном дне'); }
+  if (bad(hw).length) { ee++; console.log('  ПРОБЛЕМА отрисовки недели с дневником:', bad(hw).join(',')); }
+  markDay(TODAY, 'off', 2400);
+  if (pageWeek().indexOf('eat_k') < 0) { ee++; console.log('  нет поля калорий у дня «ели другое»'); }
+  const hp2 = pageProfile();
+  if (hp2.indexOf('Дневник питания') < 0) { ee++; console.log('  нет сводки в параметрах'); }
+  if (bad(hp2).length) { ee++; console.log('  ПРОБЛЕМА отрисовки сводки:', bad(hp2).join(',')); }
+
+  // будущий день отмечать нельзя
+  if (TODAY < PLAN.days.length - 1) {
+    day = TODAY + 1;
+    if (pageWeek().indexOf('День ещё не наступил') < 0) { ee++; console.log('  будущий день предлагает отметку'); }
+    if (pageWeek().indexOf('data-eat') >= 0) { ee++; console.log('  у будущего дня есть кнопки отметки'); }
+  }
+
+  eaten = {}; day = 0; who = 'm';
+  console.log('проблем с дневником питания:', ee);
+  }
+
   console.log('сегодня по календарю: индекс ' + TODAY + ' -> ' + PLAN.days[TODAY].name);
 })();
 `;

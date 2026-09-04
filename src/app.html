@@ -319,6 +319,7 @@ button{font:inherit; color:inherit; border:none; background:none; cursor:pointer
 .t-prot .t-t{opacity:.7}
 .t-fat{background:var(--fat-bg); color:var(--fat-ink)}
 .t-carb{background:var(--carb-bg); color:var(--carb-ink)}
+.t-fib{background:var(--sn-bg); color:var(--sn)}
 :root[data-theme="dark"] .tile .t-i, :root:not([data-theme="light"]) .tile .t-i{background:rgba(255,255,255,.08)}
 
 /* ---------- бейджи ---------- */
@@ -510,6 +511,7 @@ summary::-webkit-details-marker{display:none}
   .hero{grid-template-columns:minmax(0,1fr); gap:14px; padding:16px}
   .hero-ring{margin:0 auto}
   .tiles{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+  .tiles .tile:last-child:nth-child(odd){grid-column:1 / -1}
   .meal{grid-template-columns:44px minmax(0,1fr); gap:11px}
   .meal-r{grid-column:1 / -1; justify-content:space-between; gap:8px}
   .macro-mini{gap:4px}
@@ -610,6 +612,7 @@ const ICON = {
   drop:'<path d="M12 3.5s5.5 6 5.5 9.6a5.5 5.5 0 1 1-11 0C6.5 9.5 12 3.5 12 3.5z"/>',
   leaf:'<path d="M20 4C10 4 4.5 8 4.5 14.5A5.5 5.5 0 0 0 10 20c6.5 0 10-5.5 10-16z"/><path d="M4.5 20C8 15 12 12.5 16 11"/>',
   two:'<circle cx="9" cy="9.5" r="5.5"/><circle cx="15" cy="15" r="5.5"/>',
+  sprout:'<path d="M12 21v-7"/><path d="M12 14c0-3 2.5-5.5 5.5-5.5C17.5 11.5 15 14 12 14z"/><path d="M12 14c0-2.5-2-4.5-4.5-4.5C7.5 12 9.5 14 12 14z"/>',
   chev:'<path d="m6 9 6 6 6-6"/>'
 ,
   sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
@@ -660,6 +663,7 @@ const mealsWord = n => n === 1 ? 'один приём' : n < 5 ? n + ' приё�
 function tiles(v){
   const rows=[['t-kcal','fire','Калории',nf(v.k)+' ккал'],['t-prot','leaf','Белок',v.p+' г'],
               ['t-fat','drop','Жиры',v.f+' г'],['t-carb','wheat','Углеводы',v.c+' г']];
+  if(v.b !== undefined) rows.push(['t-fib','sprout','Клетчатка', Math.round(v.b) + ' г из ' + FIB.aim]);
   return `<div class="tiles">${rows.map(([c,i,t,val])=>
     `<div class="tile ${c}"><span class="t-i">${svg(i)}</span><span><span class="t-t">${t}</span><span class="t-v">${val}</span></span></div>`).join('')}</div>`;
 }
@@ -732,6 +736,47 @@ let consNote = '';
 let aimMeal = 'Обед';
 let consPair = store.get('kotel.conspair', true) !== false;
 let syncNote = '';
+let outNote = null;   /* кончившийся продукт и что с ним делать */
+
+/* Дневник съеденного. План есть, факта нет — и через месяц непонятно,
+   почему вес стоит: то ли план не работает, то ли по нему никто не жил.
+   Отметка привязана к календарной дате, а не к номеру дня недели, чтобы
+   записи копились неделя за неделей. Живёт только в этом браузере. */
+let eaten = store.get('kotel.eaten', {}) || {};
+if(typeof eaten !== 'object') eaten = {};
+function dayDate(i){
+  const d = new Date();
+  d.setDate(d.getDate() + (i - TODAY));
+  return d.toISOString().slice(0, 10);
+}
+const eatKey = (i, k) => (k || who) + '|' + dayDate(i);
+const eatOf = (i, k) => eaten[eatKey(i, k)] || null;
+function markDay(i, st, kcal){
+  const key = eatKey(i);
+  if(!st) delete eaten[key];
+  else eaten[key] = { s: st, k: kcal > 0 ? Math.round(kcal) : 0, t: dayDate(i) };
+  store.set('kotel.eaten', eaten);
+}
+/* Сводка за последние N дней: сколько отмечено, сколько по плану и на
+   сколько в среднем расходился факт там, где его посчитали. */
+function eatStats(k, days){
+  const back = days || 14, kk = k || who;
+  let plan = 0, off = 0, marked = 0, dev = 0, devN = 0;
+  for(let i = 0; i < back; i++){
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const rec = eaten[kk + '|' + d.toISOString().slice(0, 10)];
+    if(!rec) continue;
+    marked++;
+    if(rec.s === 'plan') plan++; else off++;
+    if(rec.k > 0){
+      const idx = (d.getDay() + 6) % 7;
+      const tgt = targetFor(kk, PLAN.days[idx].id);
+      dev += rec.k - tgt; devN++;
+    }
+  }
+  return { back, marked, plan, off, dev: devN ? dev / devN : null, devN };
+}
 let profileNote = '';
 /* Готовка впрок: варим двойной объём, а по тарелкам раскладываем то же
    самое. Множитель трогает только столбец «сколько готовить» и порядок
@@ -872,6 +917,11 @@ function mealFactor(k, dayId){
 }
 
 /* доля приёма в дневной норме */
+/* Клетчатка. На дефиците её первой и не хватает: объём еды падает, а
+   потребность нет. 25–30 г — рабочий коридор для обоих; ниже 20 начинает
+   отзываться кишечник, выше 45 на таком объёме еды уже мешает есть. */
+const FIB = { lo:20, aim:25, hi:45 };
+
 const SHARE = { 'Завтрак':0.24, 'Обед':0.31, 'Ужин':0.26, 'Перекус':0.10 };
 
 function aimFor(meal, k){
@@ -884,9 +934,100 @@ function sumOf(list){
   return list.reduce((a, x) => {
     const f = FOOD[x.n]; if(!f) return a;
     a.k += f.k * x.g / 100; a.p += f.p * x.g / 100; a.f += f.f * x.g / 100; a.c += f.c * x.g / 100;
+    a.b += (f.b || 0) * x.g / 100;
     return a;
-  }, {k:0, p:0, f:0, c:0});
+  }, {k:0, p:0, f:0, c:0, b:0});
 }
+/* Калории — жёсткая цель, белок — вторая. Сначала попадаем в калории,
+   потом внутри их коридора двигаем навески так, чтобы добрать белок:
+   меняем курицу с гарниром, а не добавляем еду сверху. Одним числом это
+   не решается — подгонка по калориям одинаково довольна и куриной
+   грудкой, и вареньем. */
+function fitAim(list, aimK, aimP){
+  fitKcal(list, aimK);
+  if(!(aimP > 0)) return;
+  for(let pass = 0; pass < 12; pass++){
+    const cur = sumOf(list), dp = aimP - cur.p;
+    if(Math.abs(dp) <= aimP * 0.08) break;
+    let best = null;
+    for(const it of list){
+      if(!it.flex) continue;
+      const f = FOOD[it.n];
+      if(!f || f.k <= 0) continue;
+      /* добирать белок огурцом бессмысленно, а снимать им — можно */
+      if(f.p < 0.5 && dp > 0) continue;
+      const step = f.unit || 5;
+      const tries = [it.g + dp / Math.max(f.p, 0.1) * 100,
+                     it.g + step, it.g - step, it.g + step * 2, it.g - step * 2];
+      for(const raw of tries){
+        const ng = roundG(f, Math.min(Math.max(raw, it.lo), it.hi));
+        if(ng === it.g) continue;
+        const d = (ng - it.g) / 100;
+        /* из калорийного коридора не выходим: он важнее */
+        if(Math.abs(cur.k + f.k * d - aimK) > aimK * 0.035) continue;
+        const gain = Math.abs(dp) - Math.abs(aimP - (cur.p + f.p * d));
+        if(gain > 0.3 && (!best || gain > best.gain)) best = { it, ng, gain };
+      }
+    }
+    /* Одиночный шаг не умеет главного: обменять гарнир на белок. Курица и
+       рис почти равны по калорийности, но по белку различаются в десять раз,
+       и человек у плиты делает именно так — кладёт больше курицы и меньше
+       риса. Поэтому пробуем ещё и парный шаг: одному добавить, другому
+       ровно на столько же калорий убавить. */
+    if(!best){
+      for(const up of list){
+        if(!up.flex) continue;
+        const fu = FOOD[up.n];
+        if(!fu || fu.p < 5 || fu.k <= 0) continue;
+        const addG = roundG(fu, Math.min(up.g + dp / (fu.p / 100), up.hi)) - up.g;
+        if(addG <= 0) continue;
+        const dk = fu.k * addG / 100;
+        for(const dn of list){
+          if(dn === up || !dn.flex) continue;
+          const fd = FOOD[dn.n];
+          if(!fd || fd.k <= 0 || fd.p >= fu.p) continue;
+          const cutG = roundG(fd, Math.max(dn.g - dk / (fd.k / 100), dn.lo)) - dn.g;
+          if(cutG >= 0) continue;
+          const nk = cur.k + dk + fd.k * cutG / 100;
+          const np = cur.p + fu.p * addG / 100 + fd.p * cutG / 100;
+          if(Math.abs(nk - aimK) > aimK * 0.035) continue;
+          const gain = Math.abs(dp) - Math.abs(aimP - np);
+          if(gain > 0.3 && (!best || gain > best.gain))
+            best = { pair:true, up, ug:up.g + addG, dn, dg:dn.g + cutG, gain };
+        }
+      }
+    }
+    if(!best) break;
+    if(best.pair){ best.up.g = best.ug; best.dn.g = best.dg; continue; }
+    best.it.g = best.ng;
+  }
+  /* Белок двигал навески внутри коридора калорий — теперь сводим калории
+     вплотную. Обычная подгонка тут же съела бы добранный белок, поэтому
+     каждый шаг оценивается двумя ценами: промах по калориям плюс штраф за
+     сломанный белок. Грамм белка стоит примерно двенадцати килокалорий
+     промаха — этого хватает, чтобы гарнир двигался раньше курицы. */
+  for(let pass = 0; pass < 10; pass++){
+    const cur = sumOf(list), diff = aimK - cur.k;
+    if(Math.abs(diff) <= aimK * 0.012) break;
+    let best = null;
+    for(const it of list){
+      if(!it.flex) continue;
+      const f = FOOD[it.n];
+      if(!f || f.k <= 0) continue;
+      const ng = roundG(f, Math.min(Math.max(it.g + diff / (f.k / 100), it.lo), it.hi));
+      if(ng === it.g) continue;
+      const d = (ng - it.g) / 100;
+      const after = Math.abs(aimK - (cur.k + f.k * d));
+      if(after >= Math.abs(diff) - 1) continue;
+      const harm = Math.max(0, Math.abs(aimP - (cur.p + f.p * d)) - Math.abs(aimP - cur.p));
+      const sc = after + harm * 12;
+      if(!best || sc < best.sc) best = { it, ng, sc };
+    }
+    if(!best) break;
+    best.it.g = best.ng;
+  }
+}
+
 function roundG(f, g){
   /* продукт мог исчезнуть из базы: свой продукт удалили, а замена на него
      осталась. Округляем как обычный весовой, а не падаем на f.unit. */
@@ -1550,10 +1691,11 @@ function dishesFor(meal, aimK){
 /* Подгонка калорий: на каждом проходе делаем один шаг — тот, что сильнее
    приближает к цели. Шаг «первый подходящий» застревал на штучных
    продуктах, где яйцу нужно было полштуки. */
-function fitKcal(list, target){
+function fitKcal(list, target, tol){
+  const t = tol || 0.04;
   for(let pass = 0; pass < 10; pass++){
     const cur = sumOf(list).k, diff = target - cur;
-    if(Math.abs(diff) <= target * 0.04) break;
+    if(Math.abs(diff) <= target * t) break;
     let best = null;
     for(const it of list){
       if(!it.flex) continue;
@@ -1585,7 +1727,7 @@ function previewDish(tpl){
     parts.push({ n:f.n, g:roundG(f, sl.base), r:sl.r, lo:sl.lo || 5, hi:sl.hi || 260, flex:!!sl.flex });
   }
   if(!tpl.slots.every(sl => !sl.req || parts.some(x => x.r === sl.r))) return null;
-  fitKcal(parts, aim.k);
+  fitAim(parts, aim.k, aim.p);
   return { parts, aim, meal, v: sumOf(parts) };
 }
 
@@ -1598,7 +1740,15 @@ function assembleDish(meal, wantId, aimOverride){
   for(const sl of t.slots){
     const pool = slotPool(sl);
     if(!pool.length){ if(sl.req) return null; continue; }
-    const f = pick(pool);
+    /* В белковой роли из двух случайных берём более белковый на калорию:
+       разнообразие остаётся, но яйцо не вытесняет творог там, где до нормы
+       белка не хватает восьми граммов. */
+    const dense = (sl.r === 'main' || sl.r === 'curd' || sl.r === 'prot');
+    let f = pick(pool);
+    if(dense && pool.length > 1){
+      const g2 = pick(pool);
+      if(g2 && g2.k > 0 && f.k > 0 && g2.p / g2.k > f.p / f.k) f = g2;
+    }
     if(parts.some(x => x.n === f.n)) continue;          // один продукт в двух ролях не нужен
     parts.push({ n:f.n, g:roundG(f, sl.base), r:sl.r, lo:sl.lo || 5, hi:sl.hi || 260, flex:!!sl.flex });
   }
@@ -1609,12 +1759,12 @@ function assembleDish(meal, wantId, aimOverride){
   if(mainIt){
     const f = FOOD[mainIt.n];
     if(f.p > 0){
-      const gp = Math.min(aim.p * 0.8 / (f.p / 100), aim.k * 0.65 / (f.k / 100));
+      const gp = Math.min(aim.p * 0.95 / (f.p / 100), aim.k * 0.65 / (f.k / 100));
       mainIt.g = roundG(f, Math.min(Math.max(gp, mainIt.lo), mainIt.hi));
       if(f.p >= 5) mainIt.hi = Math.max(mainIt.g, roundG(f, aim.p * 1.25 / (f.p / 100)));
     }
   }
-  fitKcal(parts, aim.k);
+  fitAim(parts, aim.k, aim.p);
 
   /* Перебор по белку ловим по факту, а не по имени роли: в смузи-боуле его
      несут и творог, и протеин, и вместе они давали 52 г при цели 31. */
@@ -1632,7 +1782,7 @@ function assembleDish(meal, wantId, aimOverride){
     if(ng >= top.x.g) break;
     top.x.g = ng;
     top.x.hi = ng;            // иначе подбор калорий тут же вернёт его обратно
-    fitKcal(parts, aim.k);
+    fitAim(parts, aim.k, aim.p);
   }
 
   /* Перебор даже на минимуме — снимаем необязательные компоненты, начиная
@@ -1648,7 +1798,7 @@ function assembleDish(meal, wantId, aimOverride){
       if(!worst || k > worst.k) worst = { x, k };
     }
     parts.splice(parts.indexOf(worst.x), 1);
-    fitKcal(parts, aim.k);
+    fitAim(parts, aim.k, aim.p);
   }
 
   /* вприкуску: то, что не влезло в блюдо, но нужно по калориям */
@@ -1660,7 +1810,7 @@ function assembleDish(meal, wantId, aimOverride){
       const f = pick(pool);
       side.push({ n:f.n, g:roundG(f, Math.min(Math.max(rest / (f.k / 100), f.unit || 10), 130)),
                   r:'side', lo:f.unit || 5, hi:150, flex:true, side:true });
-      fitKcal(parts.concat(side), aim.k);
+      fitAim(parts.concat(side), aim.k, aim.p);
     }
   }
   return { tpl:t, items: parts.concat(side) };
@@ -1758,12 +1908,13 @@ function mealView(di, mi, k){
       return { title:m.title, note:m.note, label:m.label, qty:v.qty, v, swapped:false };
     return { title:m.title, note:m.note, label:m.label, swapped:false, scaled:true,
              qty: scaleQty(v.qty, f),
-             v: { k:Math.round(v.k*f), p:Math.round(v.p*f), f:Math.round(v.f*f), c:Math.round(v.c*f) } };
+             v: { k:Math.round(v.k*f), p:Math.round(v.p*f), f:Math.round(v.f*f), c:Math.round(v.c*f),
+                  b:Math.round((v.b || 0)*f*10)/10 } };
   }
   const s = sumOf(sw.items);
   return {
     title: sw.title, note: sw.note || '', label: m.label, qty: qtyText(sw.items),
-    v: { k:Math.round(s.k), p:Math.round(s.p), f:Math.round(s.f), c:Math.round(s.c) },
+    v: { k:Math.round(s.k), p:Math.round(s.p), f:Math.round(s.f), c:Math.round(s.c), b:Math.round(s.b * 10) / 10 },
     swapped: true, tplId: sw.tplId, items: sw.items, parts: sw.parts
   };
 }
@@ -1772,8 +1923,8 @@ function dayTotals(di, k){
   const dr = drinkTotals(k);
   return PLAN.days[di].meals.reduce((a, _, mi) => {
     const v = mealView(di, mi, k).v;
-    a.k += v.k; a.p += v.p; a.f += v.f; a.c += v.c; return a;
-  }, { k:Math.round(dr.k), p:Math.round(dr.p), f:Math.round(dr.f), c:Math.round(dr.c) });
+    a.k += v.k; a.p += v.p; a.f += v.f; a.c += v.c; a.b += (v.b || 0); return a;
+  }, { k:Math.round(dr.k), p:Math.round(dr.p), f:Math.round(dr.f), c:Math.round(dr.c), b:0 });
 }
 
 /* ================= на двоих =================
@@ -2015,6 +2166,29 @@ function fromMeal(di, mi){
   return { parts, title: m.title, unknown: m[who].qty.split(', ').length - parts.length };
 }
 
+/* Некоторые блюда физически не дают нужного белка: четыре яйца в шакшуке
+   это 28 г при цели 37, а нут — 9 г при цели 21. Подгонка тут бессильна,
+   зато можно сказать об этом и предложить, чем добрать. */
+const PROT_FIX = ['творог 5%', 'протеин', 'йогурт греческий', 'филе куриное', 'сыр лёгкий', 'яйцо'];
+function proteinGap(){
+  if(!built.length) return null;
+  const aim = aimFor(aimMeal), tot = sumOf(built);
+  const gap = aim.p - tot.p;
+  if(gap < aim.p * 0.15) return null;
+  const pick2 = PROT_FIX.filter(n => FOOD[n] && pantry[n] && !built.some(x => x.n === n));
+  return { gap: Math.round(gap), aim, have: Math.round(tot.p), fix: pick2[0] || null };
+}
+function addProtein(){
+  const g = proteinGap();
+  if(!g || !g.fix) return;
+  const f = FOOD[g.fix];
+  const need = roundG(f, Math.min(g.gap / (f.p / 100), 200));
+  built.push({ n:g.fix, g:need, r:'prot2', lo:f.unit || 5, hi:Math.max(need * 2, 120), flex:true, side:true });
+  fitAim(built, g.aim.k, g.aim.p);
+  consNote = '';
+  render();
+}
+
 function pageCons(){
   const aim = aimFor(aimMeal);
   const tot = sumOf(built);
@@ -2075,6 +2249,16 @@ function pageCons(){
       <ol class="steps">${PV.steps.steps.map(t => `<li>${esc(t)}</li>`).join('')}</ol>` : ''}
   </div>`;
 
+  const outBlock = !outNote ? '' : `
+  <div class="card sec">
+    <div class="sec-h"><h2>Кончился продукт</h2><span class="lbl">${esc(word(outNote.n))}</span></div>
+    <p class="lead" style="margin-bottom:12px">${cap(word(outNote.n))} стоит в ${outNote.count} ${outNote.count === 1 ? 'приёме' : outNote.count < 5 ? 'приёмах' : 'приёмах'} недели у ${AT[who]}. Могу пересобрать их из того, что осталось дома — под те же калории и белок. Сладкое не трогаю: это фиксированный слот.</p>
+    <div class="row" style="gap:7px;flex-wrap:wrap">
+      <button type="button" class="btn" data-rebuild="${esc(outNote.n)}">${svg('auto')}Пересобрать ${outNote.count} ${outNote.count === 1 ? 'приём' : 'приёма'}</button>
+      <button type="button" class="btn btn-2" id="outSkip">Оставить как есть</button>
+    </div>
+  </div>`;
+
   const menuDishes = dishesFor(aimMeal);
 
   const list = allFoods();
@@ -2089,7 +2273,8 @@ function pageCons(){
       <div><label for="fp">Белок, г</label><input id="fp" type="number" min="0" max="100" step="0.1" placeholder="19"></div>
       <div><label for="ff">Жиры, г</label><input id="ff" type="number" min="0" max="100" step="0.1" placeholder="18"></div>
       <div><label for="fu">Углеводы, г</label><input id="fu" type="number" min="0" max="100" step="0.1" placeholder="1.5"></div>
-      <div class="wide"><label for="fs">Вес одной штуки, г — если продукт штучный</label><input id="fs" type="number" min="0" max="1000" step="1" placeholder="не обязательно"></div>
+      <div><label for="fb">Клетчатка, г</label><input id="fb" type="number" min="0" max="80" step="0.1" placeholder="0"></div>
+      <div><label for="fs">Вес штуки, г — если штучный</label><input id="fs" type="number" min="0" max="1000" step="1" placeholder="не обязательно"></div>
       <p class="msg ${formMsg ? (formMsg[0] === '!' ? 'err' : 'warn') : 'hint'}">${formMsg ? esc(formMsg.replace(/^[!?]/, '')) : 'КБЖУ берите с упаковки, на 100 г. Продукт сразу попадёт в кладовку и будет участвовать в сборке.'}</p>
       <div class="row"><button type="button" class="btn" id="saveFood">Сохранить</button><button type="button" class="btn btn-2" id="cancelFood">Отмена</button></div>
     </div>` : '';
@@ -2118,8 +2303,14 @@ function pageCons(){
           <div class="aim-row"><span>Белок</span><b>${Math.round(tot.p)} / ${aim.p} г</b></div>
           <div class="aim-bar${tot.p > aim.p * 1.5 ? ' over' : ''}"><i style="width:${pct(tot.p / Math.max(aim.p,1) * 100)}%"></i></div>
           <div class="aim-row"><span>Жиры / углеводы</span><b>${Math.round(tot.f)} г / ${Math.round(tot.c)} г</b></div>
+          <div class="aim-row"><span>Клетчатка</span><b>${Math.round(tot.b * 10) / 10} г</b></div>
         </div>` : ''}
         <p class="verdict ${vcls}" style="margin-top:12px">${verdict}</p>
+        ${(() => {
+          const g = proteinGap();
+          if(!g) return '';
+          return `<p class="verdict v-warn" style="margin-top:9px">Белка ${g.have} г при цели ${g.aim.p} — не хватает ${g.gap} г. Это не подгонка виновата: в самом блюде столько белка нет. ${g.fix ? 'Добавьте ' + word(g.fix) + ' — гарнир при этом ужмётся, калории останутся на месте.' : 'Отметьте в кладовке творог, йогурт или протеин, и я предложу, сколько добавить.'}</p>${g.fix ? `<button type="button" class="btn btn-2" id="doProt" style="margin-top:8px">${svg('plus')}Добрать белок: ${word(g.fix)}</button>` : ''}`;
+        })()}
       </div>
       <div>
         <div class="sec-h" style="margin-bottom:8px"><h2 style="font-size:14px">Что есть дома</h2><span class="lbl">${onCount} из ${list.length}</span></div>
@@ -2135,6 +2326,7 @@ function pageCons(){
       </div>
     </div>
   </div>
+  ${outBlock}
   ${pairBlock}`;
 }
 
@@ -2196,18 +2388,19 @@ function saveFood(){
   const val = id => (document.getElementById(id) || {}).value || '';
   const num = id => { const v = parseFloat(String(val(id)).replace(',', '.')); return isNaN(v) ? 0 : v; };
   const n = val('fn').trim().replace(/["'<>]/g, '');
-  const k = num('fk'), p = num('fp'), f = num('ff'), c = num('fu'), unit = Math.round(num('fs'));
+  const k = num('fk'), p = num('fp'), f = num('ff'), c = num('fu'), b = num('fb'), unit = Math.round(num('fs'));
 
   if(n.length < 2){ formMsg = '!Название нужно хотя бы из двух букв.'; render(); return; }
   if(FOOD[n]){ formMsg = '!Продукт «' + n + '» уже есть в списке. Назовите иначе или отредактируйте существующий.'; render(); return; }
   if(k <= 0 || k > 900){ formMsg = '!Калорийность должна быть от 1 до 900 ккал на 100 г.'; render(); return; }
-  if(p < 0 || f < 0 || c < 0){ formMsg = '!Макросы не бывают отрицательными.'; render(); return; }
+  if(p < 0 || f < 0 || c < 0 || b < 0){ formMsg = '!Макросы не бывают отрицательными.'; render(); return; }
+  if(b > 80){ formMsg = '!Клетчатки больше 80 г на 100 г не бывает даже у отрубей.'; render(); return; }
   if(p + f + c > 100){ formMsg = '!Белки, жиры и углеводы вместе не могут весить больше 100 г из 100 г.'; render(); return; }
   if(unit < 0 || unit > 1000){ formMsg = '!Вес штуки — от 1 до 1000 г, либо оставьте поле пустым.'; render(); return; }
 
   const calc = p * 4 + f * 9 + c * 4;
   const off = Math.abs(calc - k);
-  custom.push({ n, cat: val('fc') || 'Белок', k, p, f, c, unit: unit > 0 ? unit : 0, on: true, mine: true });
+  custom.push({ n, cat: val('fc') || 'Белок', k, p, f, c, b, unit: unit > 0 ? unit : 0, on: true, mine: true });
   pantry[n] = true;
   store.set('kotel.custom', custom); store.set('kotel.pantry', pantry);
   rebuildFood();
@@ -2229,6 +2422,59 @@ function planGives(k){
   }
   const n = PLAN.days.length;
   return { k:a.k / n, p:a.p / n, f:a.f / n, c:a.c / n };
+}
+
+/* Кончилась курица — руками менять шесть приёмов недели незачем.
+   Находим все, где продукт стоит, и пересобираем их из того, что осталось
+   дома, под те же калории и белок. */
+/* Курица чаще стоит не строкой в приёме, а внутри заготовки: плов, лазанья,
+   тефтели. Считаем и такие приёмы — иначе «кончилась курица» находит один
+   ужин из десяти. */
+const usesFood = (name, n) => name === n || (RECIPE[name] && RECIPE[name].ing.some(x => x.n === n));
+function mealsUsing(n, k){
+  const out = [];
+  for(let di = 0; di < PLAN.days.length; di++){
+    for(let mi = 0; mi < PLAN.days[di].meals.length; mi++){
+      const V = mealView(di, mi, k);
+      const parts = V.items && V.items.length ? V.items : splitParts(V.qty);
+      if(parts.some(x => usesFood(x.n, n)))
+        out.push({ di, mi, label: V.label, k: V.v.k, p: V.v.p });
+    }
+  }
+  return out;
+}
+/* Сладкое не трогаем: это фиксированный слот, а не блюдо из кладовки. */
+function rebuildWithout(n, k){
+  const who0 = who;
+  who = k || who;
+  const hits = mealsUsing(n, who);
+  let done = 0, kept = 0;
+  for(const h of hits){
+    if(h.label === 'Вечер'){ kept++; continue; }
+    const label = h.label === 'Перекус' ? 'Перекус' : h.label;
+    let best = null;
+    for(let t = 0; t < 60; t++){
+      const r = assembleDish(label, null, { k: h.k, p: h.p });
+      if(!r || r.items.some(x => usesFood(x.n, n))) continue;
+      const v = sumOf(r.items);
+      /* замена должна попасть и в калории, и в белок: иначе на месте
+         куриного ужина в 54 г белка оказываются вафли с двадцатью */
+      const dk = Math.abs(v.k - h.k) / h.k;
+      const dp = h.p > 0 ? (v.p - h.p) / h.p : 0;
+      const miss = dk + Math.abs(dp) * 0.8;
+      if(!best || miss < best.miss) best = { r, miss, dk, dp, v };
+      if(dk < 0.05 && Math.abs(dp) < 0.12) break;
+    }
+    if(!best || best.dk > 0.15 || best.dp < -0.3){ kept++; continue; }
+    const st = stepsFor(best.r.tpl, best.r.items);
+    applySwap(h.di, h.mi, {
+      title: st && !st.broken ? cap(st.title) : best.r.tpl.short,
+      tplId: best.r.tpl.id, items: best.r.items
+    });
+    done++;
+  }
+  who = who0;
+  return { done, kept, total: hits.length };
 }
 
 function pageProfile(){
@@ -2312,6 +2558,27 @@ function pageProfile(){
     ${profileNote ? `<p class="verdict v-warn" style="margin-top:10px">${esc(profileNote)}</p>` : ''}`
     : '<p class="verdict v-warn" style="margin-top:12px">Заполните возраст, рост и вес — без них формула не считает. Пока действует базовая норма плана: ' + nf(base.kcal) + ' ккал.</p>'}
   </div>
+  ${(() => {
+    const st = eatStats(who, 14);
+    if(!st.marked) return `<div class="card sec"><div class="sec-h"><h2>Дневник питания</h2><span class="lbl">пока пусто</span></div>
+      <p class="lead">Отмечайте в «Неделе», прошёл ли день по плану. Через пару недель эта карточка ответит на главный вопрос: вес стоит потому, что план не тянет, или потому, что по нему не жили.</p></div>`;
+    const share = Math.round(st.plan / st.marked * 100);
+    const verdict = share >= 80
+      ? 'По плану вы живёте — если вес при этом стоит, дело в норме, а не в дисциплине: снимайте 100–150 ккал с гарнира и смотрите ещё две недели.'
+      : share >= 50
+        ? 'Половина дней мимо плана. Прежде чем менять норму, стоит вернуть дисциплину: чаще всего дефицит съедают именно эти дни.'
+        : 'Большая часть дней прошла не по плану. Считать эффективность нормы пока не по чему — сначала неделя-другая как задумано.';
+    return `<div class="card sec">
+      <div class="sec-h"><h2>Дневник питания</h2><span class="lbl">за ${st.back} дней</span></div>
+      <div class="norm-out">
+        <div><span class="lbl">Отмечено дней</span><b>${st.marked}</b> <s>из ${st.back}</s></div>
+        <div><span class="lbl">По плану</span><b>${st.plan}</b> <s>${share}%</s></div>
+        <div><span class="lbl">Ели другое</span><b>${st.off}</b> <s>дней</s></div>
+        ${st.dev !== null ? `<div><span class="lbl">Средняя разница</span><b>${st.dev > 0 ? '+' : '−'}${nf(Math.abs(st.dev))}</b> <s>ккал</s></div>` : ''}
+      </div>
+      <p class="verdict ${share >= 80 ? 'v-ok' : 'v-warn'}" style="margin-top:12px">${verdict}</p>
+    </div>`;
+  })()}
   ${hist.length ? `<div class="card sec">
     <div class="sec-h"><h2>Журнал веса</h2><span class="lbl">${hist.length} ${hist.length === 1 ? 'запись' : hist.length < 5 ? 'записи' : 'записей'}</span></div>
     ${trend ? `<p class="verdict v-ok" style="margin-bottom:12px">${esc(trend)}</p>` : ''}
@@ -2607,7 +2874,7 @@ function mealRow(m, di, mi){
 function pageWeek(){
   const d=PLAN.days[day], tgt=targetFor(who, d.id);
   const apart = dayApart(day), other = who === 'm' ? 'w' : 'm';
-  const t=dayTotals(day), v={k:Math.round(t.k),p:Math.round(t.p),f:Math.round(t.f),c:Math.round(t.c)};
+  const t=dayTotals(day), v={k:Math.round(t.k),p:Math.round(t.p),f:Math.round(t.f),c:Math.round(t.c),b:Math.round(t.b)};
   const tabs = PLAN.days.map((x,i)=>
     `<button type="button" data-day="${i}" aria-pressed="${i===day}">${x.name.slice(0,3)}${i===TODAY?" •":""}<i>${nf(dayTotals(i).k)}</i></button>`).join('');
   return `
@@ -2631,6 +2898,30 @@ function pageWeek(){
   <div class="card sec">
     <div class="sec-h"><h2>Приёмы пищи</h2><span class="lbl">навеска для: ${person(who).name.toLowerCase()}</span></div>
     <div class="meals">${d.meals.map((m,mi) => mealRow(m, day, mi)).join('')}${drinkRow()}</div>
+    ${(() => {
+      const b = Math.round(v.b || 0);
+      if(b >= FIB.lo) return `<p class="verdict v-ok" style="margin-top:12px">Клетчатки за день ${b} г — коридор 25–30, и он выдержан. На дефиците её теряют первой: объём еды падает, а потребность остаётся.</p>`;
+      return `<p class="verdict v-warn" style="margin-top:12px">Клетчатки за день всего ${b} г при норме 25–30. Проще всего добрать овощами к ужину, ложкой чиа в творог или заменой гарнира на гречку — калорий это почти не добавит.</p>`;
+    })()}
+    ${(() => {
+      const rec = eatOf(day), fut = day > TODAY;
+      if(fut) return `<p class="lead" style="margin:12px 0 0">День ещё не наступил — отметить, как он прошёл, можно будет с ${esc(d.name.toLowerCase())}.</p>`;
+      const btn = (st, t) => `<button type="button" class="btn btn-2" data-eat="${st}" aria-pressed="${rec && rec.s === st}">${t}</button>`;
+      return `<div class="sec-h" style="margin-top:16px"><h2 style="font-size:15px">Как прошёл день</h2><span class="lbl">только в этом браузере</span></div>
+      <p class="lead" style="margin-bottom:10px">План есть, а факта нет — и через месяц непонятно, почему вес стоит: то ли план не тянет, то ли по нему не жили. Отметка занимает секунду и копится неделя за неделей.</p>
+      <div class="row" style="gap:7px;flex-wrap:wrap">
+        ${btn('plan', 'Ел как в плане')}${btn('off', 'Ели другое')}
+        ${rec ? `<button type="button" class="btn btn-2" data-eat="">Снять отметку</button>` : ''}
+      </div>
+      ${rec && rec.s === 'off' ? `<div class="prm" style="margin-top:10px">
+        <div><label for="eat_k">Сколько вышло, ккал</label><input id="eat_k" type="number" min="0" max="9000" step="10" value="${rec.k || ''}" placeholder="${nf(tgt)}"></div>
+        <div style="display:flex;align-items:flex-end"><button type="button" class="btn" id="eat_save" style="width:100%;justify-content:center">Записать</button></div>
+      </div>
+      <p class="lead" style="margin:8px 0 0">Если не считали — оставьте пустым. Важнее сам факт: день был не по плану.</p>` : ''}
+      ${rec ? `<p class="verdict ${rec.s === 'plan' ? 'v-ok' : 'v-warn'}" style="margin-top:10px">${rec.s === 'plan'
+        ? 'День отмечен как пройденный по плану: ' + nf(tgt) + ' ккал.'
+        : 'День отмечен как «ели другое»' + (rec.k ? ': ' + nf(rec.k) + ' ккал против ' + nf(tgt) + ' по плану, разница ' + (rec.k > tgt ? '+' : '−') + nf(Math.abs(rec.k - tgt)) + '.' : '. Калории не записаны — это нормально, факт важнее цифры.')}</p>` : ''}`;
+    })()}
     <p class="lead" style="margin:12px 0 0">Готовите сразу на двоих? Тогда эти навески нужно сложить с её — и знать, сколько потом положить каждому.</p>
     <div class="row" style="margin-top:9px;gap:7px;flex-wrap:wrap">
       <button type="button" class="btn btn-2" data-goto="pair">${svg('two')}Показать день на двоих</button>
@@ -2999,6 +3290,27 @@ document.addEventListener('click', e=>{
     render(); return;
   }
   if(e.target.id === 'doClear'){ built = []; builtTpl = null; consNote = ''; render(); return; }
+  const et = e.target.closest('[data-eat]');
+  if(et){ markDay(day, et.dataset.eat || null, 0); render(); return; }
+  if(e.target.closest('#eat_save')){
+    const el = document.getElementById('eat_k');
+    const v = el ? parseFloat(String(el.value).replace(',', '.')) : 0;
+    markDay(day, 'off', isNaN(v) ? 0 : v);
+    render(); return;
+  }
+  if(e.target.closest('#outSkip')){ outNote = null; render(); return; }
+  const rbd = e.target.closest('[data-rebuild]');
+  if(rbd){
+    const n = rbd.dataset.rebuild, r = rebuildWithout(n, who);
+    consNote = r.done
+      ? 'Пересобрано ' + r.done + ' ' + (r.done === 1 ? 'приём' : r.done < 5 ? 'приёма' : 'приёмов') + ' без «' + word(n) + '»' +
+        (r.kept ? ', ещё ' + r.kept + ' оставил как есть — из того, что дома, равного не собралось' : '') +
+        '. Замены видны в «Неделе», вернуть можно кнопкой «Вернуть как в плане».'
+      : 'Из того, что осталось дома, замену собрать не вышло. Отметьте ещё продукты в кладовке и попробуйте снова.';
+    outNote = null;
+    render(); return;
+  }
+  if(e.target.closest('#doProt')){ addProtein(); return; }
   if(e.target.closest('#doPair')){ consPair = !consPair; store.set('kotel.conspair', consPair); render(); return; }
   if(e.target.closest('#doX2')){ cookX2 = !cookX2; store.set('kotel.cookx2', cookX2); render(); return; }
   const tb = e.target.closest('[data-theme-set]');
@@ -3047,7 +3359,17 @@ document.addEventListener('change', e=>{
     render(); return;
   }
   const fd = e.target.closest('[data-food]');
-  if(fd){ pantry[fd.dataset.food] = fd.checked; store.set('kotel.pantry',pantry); render(); }
+  if(fd){
+    const n = fd.dataset.food;
+    pantry[n] = fd.checked;
+    store.set('kotel.pantry', pantry);
+    /* сняли галочку — посмотрим, не стоит ли этот продукт в меню недели */
+    if(!fd.checked){
+      const hits = mealsUsing(n, who).filter(h => h.label !== 'Вечер');
+      outNote = hits.length ? { n, count: hits.length } : null;
+    } else if(outNote && outNote.n === n) outNote = null;
+    render();
+  }
 });
 document.addEventListener('keydown', e=>{
   if(e.key === 'Escape' && query){ clearQuery(); render(); document.getElementById('q').blur(); }
