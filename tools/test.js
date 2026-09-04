@@ -1907,6 +1907,84 @@ const probe = `
   console.log('проблем с поддержкой по факту:', ft);
   }
 
+  { // список покупок считается из недели
+  let sp2 = 0;
+  profiles = {}; swaps = {}; skipped = {}; eaten = {}; custom = []; recEdit = {};
+  rebuildFood(); rebuildRecipes();
+  who = 'm'; day = 0;
+
+  const S = shopWeek();
+  const flat = () => shopWeek().groups.reduce((a, [, items]) => a.concat(items), []);
+  const all = flat();
+  if (all.length < 30) { sp2++; console.log('  список подозрительно короткий:', all.length); }
+  if (S.batches.length < 5) { sp2++; console.log('  заготовки не попали в список:', S.batches.length); }
+  for (const x of all) {
+    if (!(x.g > 0)) { sp2++; console.log('  нулевой вес в списке:', x.n); }
+    if (SHOP_ORDER.indexOf(x.cat) < 0) { sp2++; console.log('  неизвестная группа:', x.cat, x.n); }
+    if (!shopAmt(x)) { sp2++; console.log('  нечего написать в количестве:', x.n); }
+  }
+  // одна позиция — одна строка
+  const names = all.map(x => x.n);
+  if (new Set(names).size !== names.length) { sp2++; console.log('  продукт попал в список дважды'); }
+  const ids = all.map(x => shopId(x.n));
+  if (new Set(ids).size !== ids.length) { sp2++; console.log('  два продукта делят один чекбокс'); }
+
+  // крупа покупается сухой, а не отварной
+  if (names.indexOf('гречка гот.') >= 0) { sp2++; console.log('  в списке отварная гречка'); }
+  if (names.indexOf('рис гот.') >= 0) { sp2++; console.log('  в списке отварной рис'); }
+  const dry = all.find(x => x.n === 'гречка сухая');
+  if (!dry) { sp2++; console.log('  сухой гречки в списке нет'); }
+  // сырой и отварной картофель — один пакет
+  const pot = all.filter(x => x.n.indexOf('картофель') >= 0);
+  if (pot.length !== 1) { sp2++; console.log('  картофель разъехался на строки:', pot.length); }
+
+  // заготовки считаются целыми закладками
+  for (const b of S.batches) {
+    if (!(b.times >= 1)) { sp2++; console.log('  заготовка без закладки:', b.n); }
+    if (b.share > 100 || b.share <= 0) { sp2++; console.log('  доля закладки вне здравого смысла:', b.n, b.share); }
+    if (b.g > b.out * b.times + 1) { sp2++; console.log('  съедается больше, чем готовится:', b.n); }
+  }
+
+  // пропущенный день доходит до списка
+  const wasG = all.reduce((a, x) => a + x.g, 0);
+  for (let mi = 0; mi < PLAN.days[3].meals.length; mi++)
+    for (const kk of ['m', 'w']) toggleSkip(3, mi, kk);
+  const lessG = flat().reduce((a, x) => a + x.g, 0);
+  if (!(lessG < wasG)) { sp2++; console.log('  пропуск дня не уменьшил список:', Math.round(lessG), 'из', Math.round(wasG)); }
+  skipped = {};
+  if (Math.abs(flat().reduce((a, x) => a + x.g, 0) - wasG) > 1) { sp2++; console.log('  список не вернулся после отмены пропусков'); }
+
+  // замена блюда тоже доходит
+  {
+    const O = swapOptions(0, 1);
+    if (O.dishes.length) {
+      applySwap(0, 1, { title:'тест', tplId:O.dishes[0].tpl.id, items:O.dishes[0].items });
+      const now = flat().reduce((a, x) => a + x.g, 0);
+      if (Math.abs(now - wasG) < 0.5) { sp2++; console.log('  замена не изменила список'); }
+      dropSwap(0, 1);
+    }
+  }
+
+  // личная норма тоже
+  profiles.m = { sex:'m', age:31, h:175, wt:70, act:1.27, def:23, gk:1.8, fk:0.9 };
+  if (Math.abs(flat().reduce((a, x) => a + x.g, 0) - wasG) < 1) { sp2++; console.log('  личная норма не дошла до списка'); }
+  profiles = {};
+
+  // страница и поиск
+  page = 'shop';
+  const hs2 = pageShop();
+  if (bad(hs2).length) { sp2++; console.log('  ПРОБЛЕМА страницы покупок:', bad(hs2).join(',')); }
+  if (hs2.indexOf('Купить на неделю') < 0) { sp2++; console.log('  нет заголовка списка'); }
+  if (hs2.indexOf('Сколько чего готовить') < 0) { sp2++; console.log('  нет карточки заготовок'); }
+  if ((hs2.match(/data-k=/g) || []).length !== all.length) { sp2++; console.log('  чекбоксов не столько, сколько позиций'); }
+  query = 'творог';
+  const R2 = searchAll('творог');
+  if (!R2 || !R2.shop.length) { sp2++; console.log('  поиск не находит продукт в покупках'); }
+  if (bad(pageSearch()).length) { sp2++; console.log('  ПРОБЛЕМА поиска по покупкам'); }
+  query = ''; page = 'home';
+  console.log('проблем со списком покупок:', sp2);
+  }
+
   console.log('сегодня по календарю: индекс ' + TODAY + ' -> ' + PLAN.days[TODAY].name);
 })();
 `;

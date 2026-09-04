@@ -731,19 +731,6 @@ const RULES = [
   ['Сладкое','Слот до 100 ккал каждый день','Сладкое заложено в норму, а не отнято от неё. Это строка бюджета, а не срыв — именно поэтому дефицит держится дольше трёх недель.'],
   ['Точность','Считано, а не прикинуто','Рецепты посчитаны из навески и выхода, меню собрано из рецептов, навески подогнаны под целевые калории дня. Ни одна цифра не взята из таблицы «готовых блюд».']
 ];
-const SHOP = [
-  ['Чижик, еженедельно','Основная закупка, один заход',[
-    ['Белок',[['Куриное филе','2,6 кг'],['Фарш куриный','600 г'],['Фарш говяжий','650 г'],['Фарш индейки','700 г'],['Минтай, филе','1,6 кг'],['Яйца','30 шт']]],
-    ['Молочное',[['Творог 5%','2,4 кг'],['Кефир 1%','2 л'],['Молоко 1,5–2,5%','3,5 л'],['Греческий йогурт','1,2 кг'],['Сметана 15%','200 г'],['Сыр лёгкий','400 г'],['Творожный сыр','180 г']]],
-    ['Овощи и фрукты',[['Шампиньоны','2,2 кг'],['Картофель','2 кг'],['Капуста белокочанная','1,2 кг'],['Морковь / лук','по 1 кг'],['Кабачки, помидоры, огурцы','2 кг'],['Перец сладкий','400 г'],['Яблоки','2 кг'],['Бананы','1,2 кг'],['Зелень, чеснок, лимон','—']]]
-  ]],
-  ['Впрок и по случаю','Самовывоз со скидкой — ассортимент лотерейный, берите что есть',[
-    ['Крупы и мука',[['Овсяные хлопья','1,5 кг'],['Гречка','1 кг'],['Рис пропаренный','1 кг'],['Булгур, перловка','по 500 г'],['Листы для лазаньи','2 пачки'],['Мука пшеничная','2 кг'],['Мука цельнозерновая','1 кг'],['Манка','500 г']]],
-    ['Долгие запасы',[['Тунец в собственном соку','3 банки'],['Нут','500 г'],['Горошек консервированный','4 банки'],['Кукуруза консервированная','2 банки'],['Томатная паста','2 банки'],['Ягоды замороженные','1 кг'],['Арахисовая паста','350 г'],['Орехи грецкие','300 г'],['Масло растительное','—'],['Дрожжи сухие','упаковка'],['Хлебцы','2 пачки']]],
-    ['Сладкий бюджет',[['Шоколад горький 85%','2 плитки'],['Зефир','250 г'],['Пастила / мармелад','250 г'],['Какао-порошок','200 г'],['Финики','200 г'],['Мёд','250 г']]],
-    ['Уже есть дома',[['Протеин сливочный','~500 г/нед'],['Семена чиа','~150 г/нед'],['Семечки тыквенные','~150 г/нед'],['Подсолнечные, кунжут','по 80 г']]]
-  ]]
-];
 const NOTES = [
   ['Аллергия','Красной рыбы нет ни в одном приёме. Вся рыба — минтай и консервированный тунец. Омега-3 закрывают грецкие орехи и семена чиа; хотите усилить — льняное масло в салаты.'],
   ['Замены мяса','Всё считано на курице. Бедро вместо филе — плюс 50 ккал и 7 г жира на 100 г. Говядина вместо курицы в гуляше — плюс 25 ккал. Куриный фарш вместо индейки — минус 4 ккал. Треска или хек вместо минтая — плюс 5 г белка на порцию.'],
@@ -949,9 +936,9 @@ function searchAll(raw){
   const snacks = PLAN.snacks.filter(x => hit(x.title) || hit(x.qty) || hit(x.note));
   const sweets = PLAN.sweets.filter(x => hit(x.title) || hit(x.qty) || hit(x.note));
   const shop = [];
-  SHOP.forEach(([t,,groups]) => groups.forEach(([g,items]) => items.forEach(([n,amt]) => {
-    if(hit(n)) shop.push({t,g,n,amt});
-  })));
+  shopWeek().groups.forEach(([g, items]) => items.forEach(x => {
+    if(hit(x.n) || hit(word(x.n))) shop.push({ t:'Купить на неделю', g, n:cap(x.title || word(x.n)), amt:shopAmt(x) });
+  }));
   return {q, meals, recipes, snacks, sweets, shop,
           total: meals.length + recipes.length + snacks.length + sweets.length + shop.length};
 }
@@ -2455,6 +2442,91 @@ function pairDrinks(){
            k:a.k + b.k, milk:a.milk || b.milk, a, b };
 }
 
+/* ================= покупки =================
+   Список был написан руками один раз и с тех пор жил своей жизнью: ни
+   замены, ни пропуски, ни личные нормы, ни переписанные заготовки до него
+   не доходили. Считаем его из той же недели, что и всё остальное, и сразу
+   на двоих — по одному списку ходят в магазин, а не по двум. */
+const SHOP_ORDER = ['Белок', 'Молочное', 'Гарниры', 'Овощи', 'Фрукты', 'Жиры и добавки', 'Сладкое', 'Кухонное'];
+/* В меню крупа стоит отварной, а в магазине лежит сухой — и это разный вес.
+   Заодно сводим формы одного продукта в одну строку: «рис гот. 355 г» из
+   приёмов и «рис сухой 300 г» из плова — это один пакет риса. */
+const SHOP_RAW = {
+  'гречка гот.':    ['гречка сухая', 0.36],
+  'рис гот.':       ['рис сухой', 0.36],
+  'булгур гот.':    ['булгур сухой', 0.36],
+  'перловка гот.':  ['перловка сухая', 0.33],
+  'макароны гот.':  ['макароны тв. сухие', 0.44],
+  'нут отв.':       ['нут сухой', 0.42],
+  'картофель отв.': ['картофель', 1]
+};
+function shopWeek(){
+  const raw = new Map(), pots = new Map();
+  const add = (m, n, g) => m.set(n, (m.get(n) || 0) + g);
+  for(let di = 0; di < PLAN.days.length; di++)
+    PLAN.days[di].meals.forEach((_, mi) => pairMeal(di, mi).rows.forEach(r => {
+      if(RECIPE[r.n]) add(pots, r.n, r.g); else add(raw, r.n, r.g);
+    }));
+  /* Закладку готовят целиком: купить «двадцать процентов фарша» нельзя.
+     Считаем, сколько закладок нужно на неделю, и берём продукты на них. */
+  const batches = [];
+  for(const [key, g] of pots){
+    const rc = RECIPE[key], out = rc.outG || 1000;
+    const times = Math.max(1, Math.ceil(g / out - 0.05));
+    batches.push({ n:key, g, times, out, share: Math.round(g / (out * times) * 100) });
+    rc.ing.forEach(x => add(raw, x.n, x.g * times));
+  }
+  /* кофе с молоком — тоже покупка, и за неделю это литры */
+  for(const k of ['m', 'w']){
+    const d = drinkTotals(k);
+    if(!d.cups) continue;
+    if(d.milk && d.ml) add(raw, d.milk, d.cups * d.ml * PLAN.days.length);
+    if(d.sug) add(raw, 'сахар', d.cups * d.sug * PLAN.days.length);
+  }
+  /* приводим к магазинному виду и складываем то, что оказалось одним и тем же */
+  const buy = new Map();
+  for(const [n, g] of raw){
+    if(!(g > 0)) continue;
+    const to = SHOP_RAW[n];
+    const name = to ? to[0] : n, w = to ? g * to[1] : g;
+    const f = FOOD[name] || FOOD[n];
+    const e = buy.get(name) || { n:name, g:0, unit: FOOD[name] && FOOD[name].unit, cat: f ? f.cat : 'Кухонное' };
+    e.g += w;
+    buy.set(name, e);
+  }
+  const groups = new Map();
+  for(const x of buy.values()){
+    const list = groups.get(x.cat) || [];
+    list.push(x);
+    groups.set(x.cat, list);
+  }
+  /* «молоко» и «молоко» в одной группе — это молоко 1,5% и 2,5%: там, где
+     человеческое название двоится, показываем служебное, оно точное */
+  for(const list of groups.values()){
+    const seen = {};
+    list.forEach(x => { const w2 = word(x.n); seen[w2] = (seen[w2] || 0) + 1; });
+    list.forEach(x => { x.title = seen[word(x.n)] > 1 ? x.n : word(x.n); });
+  }
+  const out = [];
+  for(const cat of SHOP_ORDER.concat(Array.from(groups.keys()))){
+    if(!groups.has(cat)) continue;
+    out.push([cat, groups.get(cat).sort((a, b) => b.g - a.g)]);
+    groups.delete(cat);
+  }
+  return { groups: out, batches: batches.sort((a, b) => b.g - a.g),
+           items: out.reduce((n, x) => n + x[1].length, 0) };
+}
+/* в магазине думают килограммами и штуками, а не граммами навески */
+function shopAmt(x){
+  if(x.unit) return Math.ceil(x.g / x.unit) + ' шт';
+  /* молоко и кефир меряют литрами: «2 кг молока» в магазине не просят */
+  const wet = /молоко|кефир|сливки/.test(x.n);
+  if(wet) return String(Math.round(x.g / 100) / 10).replace('.', ',') + ' л';
+  if(x.g >= 950) return String(Math.round(x.g / 100) / 10).replace('.', ',') + ' кг';
+  return Math.max(5, Math.round(x.g / 5) * 5) + ' г';
+}
+const shopId = n => 'sh' + String(n).replace(/[^0-9a-zа-яё]/gi, '');
+
 /* варианты замены под КБЖУ именно этого приёма */
 function swapOptions(di, mi){
   const m = PLAN.days[di].meals[mi];
@@ -3231,7 +3303,7 @@ const SUBS = {
   snacks:'Взаимозаменяемые перекусы и ежедневный слот сладкого',
   drinks:'Кофе с молоком тоже считается — здесь он попадает в бюджет дня',
   cook:'Одна большая закладка и короткие вечерние — что и когда',
-  shop:'Разделено по логике доступа: скоропорт рядом с домом, длинное хранение по случаю',
+  shop:'Посчитано из вашей недели на двоих: замены, пропуски и личные нормы уже учтены',
   profile:'Нормы пересчитываются от текущего веса — параметры хранятся только в этом браузере',
   notes:'Допущения, замены и то, на что смотреть через три недели'
 };
@@ -3895,16 +3967,29 @@ function pageCook(){
 }
 
 function pageShop(){
-  return `<div class="grid g2" style="gap:14px">${SHOP.map(([t,w,groups],ci)=>`
-    <div class="card sec">
-      <div class="sec-h"><h2>${t}</h2></div>
-      <p class="lead" style="font-size:12.5px">${w}</p>
-      <div class="shopg">${groups.map(([g,items])=>
-        `<span class="lbl">${g}</span>` + items.map(([n,a])=>{
-          const id=`s${ci}_${g}_${n}`.replace(/[^\wа-яА-Я]/g,'');
-          return `<label><input type="checkbox" data-k="${id}"${checked[id]?' checked':''}><span>${esc(n)}</span><span class="amt">${esc(a)}</span></label>`;
-        }).join('')).join('')}</div>
-    </div>`).join('')}</div>`;
+  const S = shopWeek();
+  const kg = S.groups.reduce((t, [, items]) => t + items.reduce((n, x) => n + (x.unit ? 0 : x.g), 0), 0);
+  return `
+  <div class="card sec">
+    <div class="sec-h"><h2>Купить на неделю</h2><span class="lbl">${S.items} позиций · на двоих</span></div>
+    <p class="lead" style="margin-bottom:12px">Список посчитан из вашей недели: обе порции, семь дней, с учётом замен, пропусков и правки навески. Заготовки разложены на сырьё — «лазаньи 2,3 кг» в магазине не бывает. Запаса нет: это ровно то, что съедается, так что берите с небольшим верхом.</p>
+    <div class="shopg">${S.groups.map(([cat, items]) =>
+      `<span class="lbl">${esc(cat)}</span>` + items.map(x => {
+        const id = shopId(x.n);
+        return `<label><input type="checkbox" data-k="${id}"${checked[id] ? ' checked' : ''}><span>${esc(cap(x.title || word(x.n)))}</span><span class="amt">${esc(shopAmt(x))}</span></label>`;
+      }).join('')).join('')}</div>
+    <p class="verdict v-ok" style="margin-top:12px">Всего на неделю около ${String(Math.round(kg / 100) / 10).replace('.', ',')} кг продуктов на двоих. Отмеченное живёт в этом браузере и не сбрасывается до следующей правки списка.</p>
+  </div>
+  ${S.batches.length ? `<div class="card sec">
+    <div class="sec-h"><h2>Сколько чего готовить</h2><span class="lbl">${S.batches.length} заготовок</span></div>
+    <p class="lead" style="margin-bottom:12px">Продукты выше посчитаны на целые закладки: кастрюлю не варят на четверть. Здесь видно, сколько её уйдёт за неделю — остальное уходит на следующую или в морозилку.</p>
+    ${(() => {
+      const half = S.batches.filter(b => b.share < 55);
+      if(!half.length) return '';
+      return `<p class="verdict v-warn" style="margin-bottom:12px">За неделю меньше половины уходит у ${half.length === 1 ? 'одной заготовки' : half.length + ' заготовок'}: ${half.map(b => esc(word(b.n)) + ' — ' + b.share + '%').join(', ')}. Это не ошибка расчёта, а вопрос к объёму: половину такой закладки проще не готовить, чем потом придумывать, куда её деть.</p>`;
+    })()}
+    <div class="shopg">${S.batches.map(b => `<label style="cursor:default"><span>${esc(cap(word(b.n)))}</span><span class="amt">${b.times > 1 ? b.times + ' закладки · ' : ''}${esc(yieldTxt(b.out * b.times))} · съедается ${b.share}%</span></label>`).join('')}</div>
+  </div>` : ''}`;
 }
 
 function pageNotes(){
