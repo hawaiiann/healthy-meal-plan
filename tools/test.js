@@ -1073,6 +1073,126 @@ const probe = `
   console.log('проблем с поиском замены:', ss);
   }
 
+  { // сочетаемость продуктов
+  let tc = 0;
+  profiles = {}; swaps = {}; custom = []; rebuildFood(); who = 'm';
+  for (const f of allFoods()) pantry[f.n] = true;
+
+  // 1. сладкое не попадает в солёное и наоборот
+  for (const tp of DISHES) {
+    const wrong = kindOf(tp) === 'sweet' ? SAVORY_ONLY : SWEET_ONLY;
+    for (const sl of tp.slots) for (const f of slotPool(sl)) {
+      if (wrong.indexOf(f.n) >= 0) {
+        tc++; console.log('  несочетаемо:', tp.short, '(' + kindOf(tp) + ') роль', sl.r, '->', f.n);
+      }
+    }
+  }
+
+  // 2. сырые овощи не попадают в блюда с термообработкой
+  const RAW = ['огурец', 'капуста квашеная'];
+  const COLD = ['без техники', 'тостер', 'блендер', 'мороженица'];
+  for (const tp of DISHES) {
+    const cold = COLD.some(g => tp.gear.indexOf(g) >= 0);
+    for (const sl of tp.slots) {
+      if (cold || sl.fresh) continue;
+      for (const f of slotPool(sl)) if (RAW.indexOf(f.n) >= 0) {
+        tc++; console.log('  сырой овощ в готовке:', tp.short, tp.gear, sl.r, '->', f.n);
+      }
+    }
+  }
+
+  // 3. «вприкуску» берётся по характеру блюда
+  for (const tp of DISHES) {
+    const list = sideList(tp);
+    const wrong = kindOf(tp) === 'sweet' ? SIDE_SAVORY : SIDE_SWEET;
+    if (list.some(n => wrong.indexOf(n) >= 0)) { tc++; console.log('  вприкуску не из своего списка:', tp.short); }
+  }
+  {
+    /* на практике: собранное блюдо не должно принести зефир к ухе */
+    let seen = 0;
+    for (const meal of ['Завтрак', 'Обед', 'Ужин', 'Перекус']) {
+      for (let i = 0; i < 300; i++) {
+        const r = assembleDish(meal);
+        if (!r) continue;
+        for (const x of r.items) {
+          if (!x.side) continue;
+          seen++;
+          if (sideList(r.tpl).indexOf(x.n) < 0) { tc++; console.log('  чужое вприкуску:', r.tpl.short, '->', x.n); }
+        }
+      }
+    }
+  }
+
+  // 4. добор белка предлагает то, что в блюдо кладут
+  for (const kind of ['savory', 'sweet']) {
+    const wrong = kind === 'savory' ? SWEET_ONLY : SAVORY_ONLY;
+    for (const n of PROT_FIX[kind]) {
+      if (wrong.indexOf(n) >= 0) { tc++; console.log('  добор белка не того лагеря:', kind, n); }
+      if (!FOOD[n]) { tc++; console.log('  добор белка ссылается на несуществующий продукт:', n); }
+    }
+  }
+  console.log('проблем с сочетаемостью:', tc);
+  }
+
+  { // логика шагов
+  let sl2 = 0;
+  profiles = {}; swaps = {}; who = 'm';
+  for (const f of allFoods()) pantry[f.n] = true;
+
+  const root = x => x.toLowerCase().split(' ')[0].replace(/[.,%]/g, '').slice(0, 4);
+  /* фразы, которые уже ломались: предлог не того падежа, лишнее упоминание */
+  const WRONG = ['с сметан', 'вмешать бананом', 'вмешать протеином', 'обмакнуть в яйцом',
+                 'молотыми овсяные', 'добавить сметана', 'добавить куриным', 'сочность даёт он',
+                 'кусочками с грецкий', ' и и ', 'undefined', 'NaN'];
+
+  for (const meal of ['Завтрак', 'Обед', 'Ужин', 'Перекус']) {
+    for (let i = 0; i < 400; i++) {
+      const r = assembleDish(meal);
+      if (!r) continue;
+      const st = stepsFor(r.tpl, r.items);
+      if (!st || st.broken) { sl2++; console.log('  порядок готовки не собрался:', r.tpl.id); continue; }
+      const text = (st.steps.join(' ') + ' ' + st.title);
+      const low = text.toLowerCase();
+
+      /* каждый взвешенный продукт должен быть где-то назван */
+      for (const x of r.items) {
+        if (x.side) continue;
+        const rs = [root(x.n), root(word(x.n)), root(word(x.n, 1))];
+        const w2 = word(x.n).toLowerCase().split(' ');
+        if (w2[1]) rs.push(w2[1].replace(/[.,%]/g, '').slice(0, 4));
+        if (x.n === 'яйцо') rs.push('яйц');
+        if (x.n === 'масло раст.') rs.push('масл');
+        if (!rs.some(rt => rt.length > 2 && low.indexOf(rt) >= 0)) {
+          sl2++; console.log('  продукт не упомянут в шагах:', r.tpl.short, '|', x.n);
+        }
+      }
+      for (const bad2 of WRONG) if (low.indexOf(bad2.toLowerCase()) >= 0) {
+        sl2++; console.log('  кривая фраза:', bad2, '|', r.tpl.short);
+      }
+      if (/\{|\}/.test(text)) { sl2++; console.log('  незаполненная подстановка:', r.tpl.short, st.title); }
+      /* предлог «с» перед стечением согласных */
+      if (/\bс с[бвгджзклмнпрстфхцчшщ]/i.test(text)) { sl2++; console.log('  «с» вместо «со»:', r.tpl.short); }
+    }
+  }
+
+  /* техника в шагах должна соответствовать заявленной */
+  const GEAR = [['духовка', /духовк|°C|противень|форма|решётк|пергамент/i],
+                ['блендер', /блендер|пробить|взбить|смолоть/i],
+                ['мороженица', /морожениц|автомат/i],
+                ['тостер', /тостер|подсуш|поджар/i]];
+  for (const tp of DISHES) {
+    const pv = previewDish(tp);
+    if (!pv) continue;
+    const st = stepsFor(tp, pv.parts);
+    if (!st || st.broken) continue;
+    const text = st.steps.join(' ');
+    for (const [g, re] of GEAR) if (tp.gear.indexOf(g) >= 0 && !re.test(text)) {
+      sl2++; console.log('  техника «' + g + '» заявлена, а в шагах её нет:', tp.short);
+    }
+  }
+  console.log('проблем с логикой шагов:', sl2);
+  }
+
   console.log('сегодня по календарю: индекс ' + TODAY + ' -> ' + PLAN.days[TODAY].name);
 })();
 `;
