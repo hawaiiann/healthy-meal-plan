@@ -506,7 +506,10 @@ const probe = `
     twin.forEach((x, ix) => {
       const own = rr.items[ix].g, r2 = x.g / own;
       if (x.n !== rr.items[ix].n) { cn++; console.log('  состав второй порции съехал:', x.n); }
-      if (r2 < ratio * 0.6 || r2 > ratio * 1.6) {
+      // на мелкой позиции один шаг округления — это четверть веса: 20 г хлеба
+      // округляются до 5 г, и уложиться в проценты там физически нечем
+      const slack = ((FOOD[x.n] && FOOD[x.n].unit) || 5) / own;
+      if (r2 < ratio * 0.6 - slack || r2 > ratio * 1.6 + slack) {
         cn++; console.log('  навеска гуляет:', x.n, own, '->', x.g, 'при пропорции', ratio.toFixed(2));
       }
     });
@@ -1684,6 +1687,51 @@ const probe = `
   recEdit = {}; recKey = null; recDraft = null; rebuildRecipes();
   custom = []; rebuildFood(); day = 0;
   console.log('проблем с правкой заготовки:', rp);
+  }
+
+  { // ввод чисел в поля
+  let np = 0;
+  profiles = {}; swaps = {}; skipped = {}; custom = []; recEdit = {};
+  rebuildFood(); rebuildRecipes();
+  who = 'm'; day = 0; typed = null;
+
+  // пока в поле печатают, показывается набранное, а не нормализованное
+  typed = { id:'rout', text:'' };
+  if (shown('rout', 2300) !== '') { np++; console.log('  пустое поле подставляет своё число'); }
+  typed = { id:'rout', text:'2' };
+  if (shown('rout', 50) !== '2') { np++; console.log('  набранное не доживает до отрисовки:', shown('rout', 50)); }
+  if (shown('rg_0', 600) !== 600) { np++; console.log('  чужое поле подхватило набранное'); }
+  typed = null;
+  if (shown('rout', 2300) !== 2300) { np++; console.log('  без набора должно показываться состояние'); }
+
+  // разметка: в поле стоит ровно то, что набрано
+  editOpen(0, 0);
+  typed = { id:'ed_0', text:'1' };
+  const hn = pageWeek();
+  const at0 = hn.indexOf('id="ed_0"');
+  const near0 = at0 < 0 ? '' : hn.slice(at0, at0 + 200);
+  if (near0.indexOf('value="1"') < 0) { np++; console.log('  набранное не попало в разметку приёма'); }
+  typed = null; editKey = null; editDraft = null;
+
+  // недобранный выход считается по исходному, а не по «2 г»
+  const rr0 = ORIG['плов'];
+  const mid = recalcRecipe(rr0, { ing: rr0.ing.map(x => ({ n:x.n, g:x.g })), outG: 2 });
+  if (mid.per100.k !== rr0.per100.k) { np++; console.log('  середина набора числа поменяла рецепт:', mid.per100.k, 'vs', rr0.per100.k); }
+
+  // и сохранение такого выхода оставляет исходный
+  recKey = 'плов'; recDraft = { ing: rr0.ing.map(x => ({ n:x.n, g:x.g })), outG: 2 };
+  saveRecipe();
+  if (recEdit['плов']) { np++; console.log('  бессмысленный выход сохранился'); }
+  if (RECIPE['плов'].per100.k !== rr0.per100.k) { np++; console.log('  рецепт поехал от бессмысленного выхода'); }
+
+  // а осмысленный — сохраняется и меняет плотность
+  recKey = 'плов'; recDraft = { ing: rr0.ing.map(x => ({ n:x.n, g:x.g })), outG: Math.round(rr0.outG / 2) };
+  saveRecipe();
+  if (!recEdit['плов']) { np++; console.log('  осмысленный выход не сохранился'); }
+  else if (recEdit['плов'].outG !== Math.round(rr0.outG / 2)) { np++; console.log('  сохранился не тот выход:', recEdit['плов'].outG); }
+  if (RECIPE['плов'].per100.k < rr0.per100.k * 1.8) { np++; console.log('  половинный выход не удвоил плотность'); }
+  recEdit = {}; recKey = null; recDraft = null; rebuildRecipes();
+  console.log('проблем с вводом чисел:', np);
   }
 
   console.log('сегодня по календарю: индекс ' + TODAY + ' -> ' + PLAN.days[TODAY].name);
