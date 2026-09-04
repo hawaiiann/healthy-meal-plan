@@ -870,20 +870,52 @@ let showForm = false, formMsg = '';
 let profiles = store.get('kotel.profiles', {}) || {};
 if(typeof profiles !== 'object') profiles = {};
 
+/* Раньше зал и прогулки сидели внутри одного коэффициента, и было не
+   разобрать, что в нём учтено: «2–3 прогулки» это в неделю или в день?
+   Теперь поддержка складывается из трёх слагаемых — быт, зал и ходьба.
+   Коэффициент описывает только быт, без тренировок и прогулок. */
 const ACT = [
-  [1.2,   'Почти не двигаюсь, зала нет'],
-  [1.375, 'Сидячая работа, 3 тренировки в неделю'],
-  [1.465, 'Сидячая работа, 4–5 тренировок'],
-  [1.55,  'Активный день или 6 тренировок']
+  [1.2,  'Сижу весь день, дома тоже'],
+  [1.27, 'Сидячая работа, но не весь день на стуле'],
+  [1.35, 'На ногах часть дня'],
+  [1.45, 'Физическая работа']
 ];
+const ACT_DEF = 1.27;
+/* ходьба сверх покоя: килокалории на килограмм массы на километр */
+const PACE = [
+  [0.45, 'Спокойный, можно разговаривать'],
+  [0.55, 'Обычный, около 5 км/ч'],
+  [0.7,  'Быстрый, до одышки']
+];
+const PACE_DEF = 0.55;
+/* силовая тренировка сверх покоя: примерно 4 ккал на килограмм в час */
+const GYM_KCAL_KG_H = 4;
+
+/* Слагаемые поддержки: быт, зал, прогулки. Возвращаем и итог, и разбивку —
+   в карточке нормы видно, из чего она собрана. */
+function energyParts(p, wt){
+  const bmr = 10 * wt + 6.25 * CLAMP(p.h, 120, 220) - 5 * CLAMP(p.age, 14, 90) + (p.sex === 'm' ? 5 : -161);
+  /* старые профили хранили коэффициент вместе с залом — такие уводим к бытовому */
+  const raw = p.act || ACT_DEF;
+  const act = ACT.some(a => Math.abs(a[0] - raw) < 0.001) ? raw : ACT_DEF;
+  const life = bmr * CLAMP(act, 1.15, 1.6);
+  const gym = gymCount() * wt * GYM_KCAL_KG_H * CLAMP(p.gymH || 1, 0.5, 3) / 7;
+  const w = p.walk || {};
+  /* поля по отдельности правдоподобны, а их произведение — нет: три
+     прогулки в день по тридцать километров это шестьсот километров в
+     неделю. Ограничиваем недельный километраж целиком. */
+  const km7 = CLAMP(CLAMP(w.n || 0, 0, 21) * CLAMP(w.km || 0, 0, 30), 0, 100);
+  const walk = km7 * wt * CLAMP(w.pace || PACE_DEF, 0.3, 0.9) / 7;
+  return { bmr, life, gym, walk, tdee: life + gym + walk };
+}
 const CLAMP = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 function calcNorm(p){
   if(!p || !(p.wt > 25) || !(p.h > 100) || !(p.age > 10)) return null;
   /* границы держим и здесь: в браузере мог остаться профиль, сохранённый
      до того, как поля стали ограничивать ввод */
   const wt  = CLAMP(p.wt, 35, 250), h = CLAMP(p.h, 120, 220), age = CLAMP(p.age, 14, 90);
-  const bmr  = 10 * wt + 6.25 * h - 5 * age + (p.sex === 'm' ? 5 : -161);
-  const tdee = bmr * CLAMP(p.act || 1.375, 1.2, 1.9);
+  const E = energyParts(p, wt);
+  const bmr = E.bmr, tdee = E.tdee;
   const kcal = Math.round(tdee * (1 - CLAMP(p.def || 12, 5, 30) / 100) / 5) * 5;
   const prot = Math.round(wt * CLAMP(p.gk || 1.8, 1.2, 2.5));
   const fat  = Math.round(wt * CLAMP(p.fk || 0.9, 0.6, 1.5));
@@ -892,7 +924,8 @@ function calcNorm(p){
   let fat2 = fat;
   if(prot * 4 + fat2 * 9 > kcal * 0.9) fat2 = Math.max(Math.round(wt * 0.6), Math.round((kcal * 0.9 - prot * 4) / 9));
   const carb = Math.max(0, Math.round((kcal - prot * 4 - fat2 * 9) / 4));
-  return { bmr:Math.round(bmr), tdee:Math.round(tdee), kcal, prot, fat:fat2, carb };
+  return { bmr:Math.round(bmr), tdee:Math.round(tdee), kcal, prot, fat:fat2, carb,
+           life:Math.round(E.life), gym:Math.round(E.gym), walk:Math.round(E.walk) };
 }
 /* норма человека: своя, если параметры заданы, иначе базовая из плана */
 function person(k){
@@ -2539,7 +2572,12 @@ function saveProfile(){
   p.age = age > 0 ? cut(age, 14, 90, 'возраст', ' лет') : age;
   p.h   = h  > 0 ? cut(h, 120, 220, 'рост', ' см') : h;
   p.wt  = wt > 0 ? cut(wt, 35, 250, 'вес', ' кг') : wt;
-  p.act = num('pf_act') || 1.375;
+  p.act = num('pf_act') || ACT_DEF;
+  p.gymH = cut(num('pf_gh') || 1, 0.5, 3, 'тренировка', ' ч');
+  const wn = Math.round(num('pf_wn')), wk = num('pf_wk');
+  p.walk = { n: cut(wn > 0 ? wn : 0, 0, 21, 'прогулок', ' в неделю'),
+             km: cut(wk > 0 ? wk : 0, 0, 30, 'километров', ' за раз'),
+             pace: num('pf_wp') || PACE_DEF };
   const def = num('pf_def'), gk = num('pf_gk');
   p.def = cut(def > 0 ? def : 12, 5, 30, 'дефицит', '%');
   p.gk  = cut(gk > 0 ? gk : 1.8, 1.2, 2.5, 'белок', ' г/кг');
@@ -2702,6 +2740,11 @@ function pageProfile(){
       <div class="wide"><label>Образ жизни</label><select id="pf_act">${actOpts}</select></div>
       <div><label>Дефицит, %</label><input id="pf_def" type="number" min="0" max="30" step="1" value="${p.def === undefined ? '' : p.def}" placeholder="12"></div>
       <div><label>Белок, г на кг</label><input id="pf_gk" type="number" min="1" max="2.5" step="0.05" value="${p.gk === undefined ? '' : p.gk}" placeholder="1,8"></div>
+      <div><label>Тренировка, часов</label><input id="pf_gh" type="number" min="0.5" max="3" step="0.25" value="${p.gymH === undefined ? '' : p.gymH}" placeholder="1"></div>
+      <div class="wide"><span class="lbl" style="display:block;margin-bottom:6px">Прогулки — считаются отдельно от зала</span></div>
+      <div><label>Прогулок в неделю</label><input id="pf_wn" type="number" min="0" max="21" step="1" value="${(p.walk && p.walk.n !== undefined) ? p.walk.n : ''}" placeholder="3"></div>
+      <div><label>Километров за раз</label><input id="pf_wk" type="number" min="0" max="30" step="0.5" value="${(p.walk && p.walk.km !== undefined) ? String(p.walk.km).replace('.', ',') : ''}" placeholder="2,5"></div>
+      <div class="wide"><label>Темп</label><select id="pf_wp">${PACE.map(([v, t2]) => `<option value="${v}"${Math.abs(((p.walk && p.walk.pace) || PACE_DEF) - v) < 0.001 ? " selected" : ""}>${t2}</option>`).join('')}</select></div>
       <div class="wide" style="display:flex;gap:8px;flex-wrap:wrap">
         <button type="button" class="btn" id="pf_save">Пересчитать норму</button>
         ${p.wt ? '<button type="button" class="btn btn-2" id="pf_reset">Сбросить к базовой</button>' : ''}
@@ -2709,6 +2752,9 @@ function pageProfile(){
     </div>
     ${n ? `<div class="norm-out" style="margin-top:14px">
       <div><span class="lbl">Обмен покоя</span><b>${nf(n.bmr)}</b> <s>ккал</s></div>
+      <div><span class="lbl">Быт</span><b>${nf(n.life)}</b> <s>ккал</s></div>
+      <div><span class="lbl">Зал</span><b>+${nf(n.gym)}</b> <s>ккал/день</s></div>
+      <div><span class="lbl">Прогулки</span><b>+${nf(n.walk)}</b> <s>ккал/день</s></div>
       <div><span class="lbl">Поддержка</span><b>${nf(n.tdee)}</b> <s>ккал</s></div>
       <div><span class="lbl">Норма</span><b>${nf(n.kcal)}</b> <s>ккал</s></div>
       <div><span class="lbl">Белок</span><b>${n.prot}</b> <s>г</s></div>

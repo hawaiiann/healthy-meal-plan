@@ -1265,6 +1265,85 @@ const probe = `
   console.log('проблем с днями зала:', gy);
   }
 
+  { // прогулки отдельным слагаемым
+  let wl = 0;
+  profiles = {}; swaps = {}; who = 'm';
+  gymDays = PLAN.days.map(d => !!d.gym);
+  const him = { sex:'m', age:31, h:175, wt:90, act:1.27, def:23, gk:1.8, fk:0.9, gymH:1 };
+  const walk = (n, km, pace) => Object.assign({}, him, { walk: { n, km, pace: pace || 0.55 } });
+
+  // слагаемые складываются в поддержку
+  {
+    const n = calcNorm(walk(3, 2.5));
+    if (Math.abs(n.life + n.gym + n.walk - n.tdee) > 2) { wl++; console.log('  слагаемые не дают поддержку:', n.life, n.gym, n.walk, n.tdee); }
+    if (!(n.walk > 0)) { wl++; console.log('  прогулки не дали прибавки'); }
+  }
+
+  // больше прогулок, длиннее, быстрее — больше энергии
+  const e = (n, km, pace) => calcNorm(walk(n, km, pace)).walk;
+  if (!(e(3, 2.5) < e(7, 2.5))) { wl++; console.log('  число прогулок не влияет'); }
+  if (!(e(3, 2.5) < e(3, 5))) { wl++; console.log('  длина прогулки не влияет'); }
+  if (!(e(3, 2.5, 0.45) < e(3, 2.5, 0.7))) { wl++; console.log('  темп не влияет'); }
+  if (e(0, 0) !== 0) { wl++; console.log('  без прогулок прибавка должна быть нулевой:', e(0, 0)); }
+
+  // прогулки заметно двигают норму, а не для галочки
+  {
+    const a = calcNorm(walk(0, 0)).kcal, b = calcNorm(walk(7, 5)).kcal;
+    if (b - a < 100) { wl++; console.log('  ежедневные 5 км почти не изменили норму:', a, '->', b); }
+  }
+
+  // зал считается от числа отмеченных дней
+  {
+    const before = calcNorm(walk(3, 2.5)).gym;
+    gymDays = [true, true, false, true, true, false, false];
+    const after = calcNorm(walk(3, 2.5)).gym;
+    if (!(after > before)) { wl++; console.log('  четвёртая тренировка не добавила энергии:', before, after); }
+    gymDays = [false, false, false, false, false, false, false];
+    if (calcNorm(walk(3, 2.5)).gym !== 0) { wl++; console.log('  без тренировок зал должен давать ноль'); }
+    gymDays = PLAN.days.map(d => !!d.gym);
+  }
+
+  // старый коэффициент, где зал сидел внутри, уводится к бытовому
+  {
+    const legacy = calcNorm(Object.assign({}, walk(3, 2.5), { act: 1.375 }));
+    const fresh = calcNorm(walk(3, 2.5));
+    if (Math.abs(legacy.tdee - fresh.tdee) > 2) { wl++; console.log('  старый профиль считается по-другому:', legacy.tdee, fresh.tdee); }
+  }
+
+  // абсурдные значения режутся
+  {
+    const mad = calcNorm(Object.assign({}, him, { walk: { n: 99, km: 500, pace: 9 }, gymH: 12 }));
+    if (mad.tdee > 6000) { wl++; console.log('  прогулки не ограничены сверху:', mad.tdee); }
+    if (mad.kcal <= 0) { wl++; console.log('  норма провалилась'); }
+  }
+
+  // форма сохраняет прогулки и говорит об урезании
+  {
+    const orig = document.getElementById;
+    const vals = { pf_sex:'m', pf_age:'31', pf_h:'175', pf_wt:'90', pf_act:'1.27',
+                   pf_def:'23', pf_gk:'1.8', pf_gh:'1', pf_wn:'99', pf_wk:'2,5', pf_wp:'0.55' };
+    document.getElementById = id => (id in vals ? { value: vals[id] } : orig(id));
+    who = 'm'; saveProfile();
+    document.getElementById = orig;
+    if (!profiles.m.walk || profiles.m.walk.n !== 21) { wl++; console.log('  число прогулок не урезано:', profiles.m.walk && profiles.m.walk.n); }
+    if (Math.abs(profiles.m.walk.km - 2.5) > 0.01) { wl++; console.log('  километры не разобрались из запятой:', profiles.m.walk.km); }
+    if (!profileNote) { wl++; console.log('  про урезание прогулок не сказано'); }
+    const h4 = pageProfile();
+    if (h4.indexOf('Прогулок в неделю') < 0) { wl++; console.log('  нет поля прогулок'); }
+    if (h4.indexOf('Прогулки') < 0) { wl++; console.log('  нет строки прогулок в разбивке'); }
+    if (h4.indexOf('>Быт<') < 0) { wl++; console.log('  нет строки быта в разбивке'); }
+    if (bad(h4).length) { wl++; console.log('  ПРОБЛЕМА отрисовки параметров:', bad(h4).join(',')); }
+    profiles = {};
+  }
+
+  // без заполненного профиля план не трогается
+  {
+    const base = PLAN.people.m.kcal;
+    if (person('m').kcal !== base) { wl++; console.log('  базовая норма изменилась без профиля'); }
+  }
+  console.log('проблем с прогулками:', wl);
+  }
+
   console.log('сегодня по календарю: индекс ' + TODAY + ' -> ' + PLAN.days[TODAY].name);
 })();
 `;
