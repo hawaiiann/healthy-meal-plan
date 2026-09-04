@@ -796,6 +796,21 @@ let editDraft = null;
    недосчитался. Ключ тот же, что у замен, — у каждого пропуск свой. */
 let skipped = store.get('kotel.skip', {}) || {};
 if(typeof skipped !== 'object') skipped = {};
+/* Пропуски копятся по датам — старые чистим, иначе через год в браузере
+   лежит триста ключей ни о чём. Заодно уходят записи прежнего формата,
+   когда пропуск ставился на день недели и возвращался каждую неделю. */
+(function(){
+  const edge = new Date();
+  edge.setDate(edge.getDate() - 30);
+  const old = edge.toISOString().slice(0, 10);
+  let touched = false;
+  for(const key of Object.keys(skipped)){
+    const d = String(key).split('|')[1] || '';
+    if(/^\d{4}-\d\d-\d\d\./.test(d) && d.slice(0, 10) >= old) continue;
+    delete skipped[key]; touched = true;
+  }
+  if(touched) store.set('kotel.skip', skipped);
+})();
 
 /* Правка заготовки. Рецепт — не догма: грибов взяли больше, сметану
    убрали, вышло не 2,4 кг, а два. Меняется навеска или выход — меняется
@@ -848,32 +863,50 @@ function dayDate(i){
   return d.toISOString().slice(0, 10);
 }
 const eatKey = (i, k) => (k || who) + '|' + dayDate(i);
+/* Замена — часть плана: «у меня в среду теперь другой ужин» верно и через
+   неделю. Пропуск — событие: пропустив обед в понедельник, вы не собирались
+   пропускать его каждый понедельник. Поэтому ключ у него по дате, как у
+   дневника, а не по дню недели, как у замен. */
+const skipKey = (di, mi, k) => (k || who) + '|' + dayDate(di) + '.' + mi;
 const eatOf = (i, k) => eaten[eatKey(i, k)] || null;
+/* «Ел как в плане» — это не цель дня, а то, что в дне стоит сейчас: с
+   пропусками, заменами и правкой навески. Приложение это число знает, и
+   выбрасывать его, записывая ноль, было бы странно: тогда средний факт
+   собирается только из дней, когда вы сорвались, и врёт в одну сторону. */
+function markToday(i, st){
+  const was = eatOf(i);
+  markDay(i, st, st === 'plan' ? dayTotals(i).k : (was && was.k) || 0);
+}
 function markDay(i, st, kcal){
   const key = eatKey(i);
   if(!st) delete eaten[key];
   else eaten[key] = { s: st, k: kcal > 0 ? Math.round(kcal) : 0, t: dayDate(i) };
   store.set('kotel.eaten', eaten);
 }
-/* Сводка за последние N дней: сколько отмечено, сколько по плану и на
-   сколько в среднем расходился факт там, где его посчитали. */
+/* Сводка за последние N дней: сколько отмечено, сколько по плану, сколько
+   в среднем съедено и на сколько это расходится с целью. Средний факт
+   нужен не для красоты: из него и веса считается настоящая поддержка. */
 function eatStats(k, days){
   const back = days || 14, kk = k || who;
-  let plan = 0, off = 0, marked = 0, dev = 0, devN = 0;
+  let plan = 0, off = 0, marked = 0, dev = 0, devN = 0, sum = 0;
+  const seen = [];
   for(let i = 0; i < back; i++){
     const d = new Date();
     d.setDate(d.getDate() - i);
-    const rec = eaten[kk + '|' + d.toISOString().slice(0, 10)];
+    const date = d.toISOString().slice(0, 10);
+    const rec = eaten[kk + '|' + date];
     if(!rec) continue;
     marked++;
     if(rec.s === 'plan') plan++; else off++;
     if(rec.k > 0){
       const idx = (d.getDay() + 6) % 7;
       const tgt = targetFor(kk, PLAN.days[idx].id);
-      dev += rec.k - tgt; devN++;
+      dev += rec.k - tgt; devN++; sum += rec.k;
+      seen.push({ date, k: rec.k });
     }
   }
-  return { back, marked, plan, off, dev: devN ? dev / devN : null, devN };
+  return { back, marked, plan, off, dev: devN ? dev / devN : null, devN,
+           avg: devN ? sum / devN : null, days: seen };
 }
 let profileNote = '';
 /* Готовка впрок: варим двойной объём, а по тарелкам раскладываем то же
@@ -2178,7 +2211,7 @@ function scaleParts(parts, targetK){
 function mealView(di, mi, k){
   k = k || who;
   const V = mealPlanned(di, mi, k);
-  if(!skipped[swapKey(di, mi, k)]) return V;
+  if(!skipped[skipKey(di, mi, k)]) return V;
   /* пропущенный приём остаётся на виду, но в счёт дня не идёт */
   return Object.assign({}, V, { skip:true, plan:V.v, v:{ k:0, p:0, f:0, c:0, b:0 } });
 }
@@ -2501,7 +2534,7 @@ function purgeFood(n){
 
 /* пропустить приём и вернуть его обратно — одно и то же движение */
 function toggleSkip(di, mi, k){
-  const key = swapKey(di, mi, k);
+  const key = skipKey(di, mi, k);
   if(skipped[key]) delete skipped[key]; else skipped[key] = 1;
   store.set('kotel.skip', skipped);
 }
@@ -2531,8 +2564,9 @@ function syncDay(di, from){
     const sw = swaps[swapKey(di, mi, src)], key = swapKey(di, mi, dst);
     /* пропуск — тоже часть набора дня: перенести блюда и оставить у
        второго дыру было бы странно */
-    if(skipped[swapKey(di, mi, src)]){ if(!skipped[key]){ skipped[key] = 1; skips++; } }
-    else if(skipped[key]){ delete skipped[key]; skips++; }
+    const sks = skipKey(di, mi, src), skd = skipKey(di, mi, dst);
+    if(skipped[sks]){ if(!skipped[skd]){ skipped[skd] = 1; skips++; } }
+    else if(skipped[skd]){ delete skipped[skd]; skips++; }
     if(!sw || !sw.items || !sw.items.length){
       if(swaps[key]){ delete swaps[key]; cleared++; }
       return;
@@ -3461,7 +3495,7 @@ function pageWeek(){
     <div class="sec-h"><h2>Приёмы пищи</h2><span class="lbl">навеска для: ${person(who).name.toLowerCase()}</span></div>
     <div class="meals">${d.meals.map((m,mi) => mealRow(m, day, mi)).join('')}${drinkRow()}</div>
     ${(() => {
-      const sk = d.meals.filter((_, mi) => skipped[swapKey(day, mi)]).length;
+      const sk = d.meals.filter((_, mi) => skipped[skipKey(day, mi)]).length;
       if(!sk) return '';
       const lost = d.meals.reduce((a, _, mi) => {
         const V = mealView(day, mi);
@@ -3490,7 +3524,9 @@ function pageWeek(){
       </div>
       <p class="lead" style="margin:8px 0 0">Если не считали — оставьте пустым. Важнее сам факт: день был не по плану.</p>` : ''}
       ${rec ? `<p class="verdict ${rec.s === 'plan' ? 'v-ok' : 'v-warn'}" style="margin-top:10px">${rec.s === 'plan'
-        ? 'День отмечен как пройденный по плану: ' + nf(tgt) + ' ккал.'
+        ? 'День отмечен как пройденный: съедено ' + nf(rec.k || v.k) + ' ккал' +
+          (Math.abs((rec.k || v.k) - tgt) < 25 ? ' — это и есть цель дня.'
+            : ' при цели ' + nf(tgt) + ', разница ' + ((rec.k || v.k) > tgt ? '+' : '−') + nf(Math.abs((rec.k || v.k) - tgt)) + '.')
         : 'День отмечен как «ели другое»' + (rec.k ? ': ' + nf(rec.k) + ' ккал против ' + nf(tgt) + ' по плану, разница ' + (rec.k > tgt ? '+' : '−') + nf(Math.abs(rec.k - tgt)) + '.' : '. Калории не записаны — это нормально, факт важнее цифры.')}</p>` : ''}`;
     })()}
     <p class="lead" style="margin:12px 0 0">Готовите сразу на двоих? Тогда эти навески нужно сложить с её — и знать, сколько потом положить каждому.</p>
@@ -4025,7 +4061,7 @@ document.addEventListener('click', e=>{
   const gd = e.target.closest('[data-gym]');
   if(gd){ const i = +gd.dataset.gym; setGym(i, !isGym(i)); render(); return; }
   const et = e.target.closest('[data-eat]');
-  if(et){ markDay(day, et.dataset.eat || null, 0); render(); return; }
+  if(et){ markToday(day, et.dataset.eat || null); render(); return; }
   if(e.target.closest('#eat_save')){
     const el = document.getElementById('eat_k');
     const v = el ? parseFloat(String(el.value).replace(',', '.')) : 0;

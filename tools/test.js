@@ -1537,7 +1537,7 @@ const probe = `
 
   // весь день пропущен — страницы не разваливаются
   for (let mi = 0; mi < PLAN.days[0].meals.length; mi++)
-    for (const kk of ['m', 'w']) if (!skipped[swapKey(0, mi, kk)]) toggleSkip(0, mi, kk);
+    for (const kk of ['m', 'w']) if (!skipped[skipKey(0, mi, kk)]) toggleSkip(0, mi, kk);
   for (const fpage of [pageWeek, pagePair]) {
     const b2 = bad(fpage());
     if (b2.length) { sk++; console.log('  ПРОБЛЕМА пустого дня:', b2.join(',')); }
@@ -1552,7 +1552,7 @@ const probe = `
   // перенос набора дня забирает и пропуски
   toggleSkip(2, 0, 'm');
   syncDay(2, 'm');
-  if (!skipped[swapKey(2, 0, 'w')]) { sk++; console.log('  пропуск не перенёсся на второго'); }
+  if (!skipped[skipKey(2, 0, "w")]) { sk++; console.log('  пропуск не перенёсся на второго'); }
   skipped = {}; swaps = {}; day = 0;
   console.log('проблем с пропуском приёма:', sk);
   }
@@ -1755,6 +1755,73 @@ const probe = `
   // в шаблоне обратный слэш не доживает до кода — класс пишем цифрами
   if (String('12абв').replace(/[^0-9.,]/g, '') !== '12') { np++; console.log('  чистка поля от букв не работает'); }
   console.log('проблем с вводом чисел:', np);
+  }
+
+  { // пропуск привязан к дате, а не к дню недели
+  let dk = 0;
+  profiles = {}; swaps = {}; skipped = {}; eaten = {}; custom = []; recEdit = {};
+  rebuildFood(); rebuildRecipes();
+  who = 'm'; day = 0;
+
+  const kd = skipKey(0, 1), ks = swapKey(0, 1);
+  if (kd === ks) { dk++; console.log('  пропуск и замена делят один ключ'); }
+  if (kd.indexOf(dayDate(0)) < 0) { dk++; console.log('  в ключе пропуска нет даты:', kd); }
+
+  // ключ прежнего формата (по дню недели) на приём больше не влияет
+  skipped[ks] = 1;
+  if (mealView(0, 1).skip) { dk++; console.log('  пропуск по дню недели всё ещё работает'); }
+  skipped = {};
+
+  // пропуск ставится на конкретное число и не задевает тот же день недели
+  toggleSkip(0, 1);
+  if (!mealView(0, 1).skip) { dk++; console.log('  пропуск не поставился'); }
+  const other = Object.keys(skipped)[0];
+  if (other.slice(other.indexOf('|') + 1, other.indexOf('.')).length !== 10) { dk++; console.log('  дата в ключе не похожа на дату:', other); }
+  skipped = {};
+  console.log('проблем с привязкой пропуска:', dk);
+  }
+
+  { // дневник пишет факт, а не ноль
+  let dn = 0;
+  profiles = {}; swaps = {}; skipped = {}; eaten = {}; custom = []; recEdit = {};
+  rebuildFood(); rebuildRecipes();
+  who = 'm'; day = 0;
+
+  markToday(0, 'plan');
+  const rec1 = eatOf(0);
+  if (!rec1) { dn++; console.log('  отметка не записалась'); }
+  else if (Math.abs(rec1.k - dayTotals(0).k) > 1) { dn++; console.log('  записан не факт дня:', rec1.k, 'вместо', dayTotals(0).k); }
+
+  // пропустили приём — записанное уменьшилось ровно на него
+  const was1 = eatOf(0).k, lost = mealView(0, 1).v.k;
+  toggleSkip(0, 1);
+  markToday(0, 'plan');
+  if (Math.abs(eatOf(0).k - (was1 - lost)) > 1) { dn++; console.log('  пропуск не дошёл до дневника:', eatOf(0).k, 'вместо', was1 - lost); }
+  toggleSkip(0, 1);
+  markToday(0, 'plan');
+
+  // «ели другое» не затирает вписанную вручную цифру
+  markDay(0, 'off', 1234);
+  markToday(0, 'off');
+  if (eatOf(0).k !== 1234) { dn++; console.log('  вписанные калории затёрлись:', eatOf(0).k); }
+
+  // средний факт считается по всем отмеченным дням, а не только по срывам
+  eaten = {};
+  markToday(0, 'plan'); markToday(1, 'plan'); markDay(2, 'off', 2500);
+  const st2 = eatStats('m', 14);
+  if (st2.devN !== 3) { dn++; console.log('  в среднее попали не все дни:', st2.devN); }
+  if (!(st2.avg > 0)) { dn++; console.log('  средний факт не посчитан'); }
+  const hand = (eatOf(0).k + eatOf(1).k + 2500) / 3;
+  if (Math.abs(st2.avg - hand) > 1) { dn++; console.log('  средний факт неверен:', Math.round(st2.avg), 'вместо', Math.round(hand)); }
+  if (st2.days.length !== 3) { dn++; console.log('  дни для расчёта поддержки не собрались:', st2.days.length); }
+
+  // отметка говорит настоящее число
+  day = 0;
+  const hd = pageWeek();
+  if (hd.indexOf('съедено') < 0) { dn++; console.log('  отметка не показывает факт'); }
+  if (bad(hd).length) { dn++; console.log('  ПРОБЛЕМА недели с отметкой:', bad(hd).join(',')); }
+  eaten = {}; skipped = {};
+  console.log('проблем с дневником факта:', dn);
   }
 
   console.log('сегодня по календарю: индекс ' + TODAY + ' -> ' + PLAN.days[TODAY].name);
